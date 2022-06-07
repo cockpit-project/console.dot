@@ -1,6 +1,6 @@
 PORT ?= 8443
 CONTAINER_NAME=console-nginx
-USER ?= cockpit
+USER = admin
 PASSWORD ?= foobar
 
 certs/service-chain.pem: certs/service.pem
