@@ -1,21 +1,16 @@
 PORT ?= 8443
-CONTAINER_NAME=console-nginx
-USER = admin
-PASSWORD ?= foobar
+NETWORK=consoledot
 
-certs/service-chain.pem: certs/service.pem
-	cat certs/service.pem certs/ca.crt > certs/service-chain.pem
-
-htpasswd:
-	htpasswd -bc htpasswd $(USER) $(PASSWORD)
-
-certs/service.pem:
-	mkdir -p certs && cd certs && sscg
-
-container: certs/service-chain.pem htpasswd
-	podman build -t $(CONTAINER_NAME) .
+.PHONY: containers
+containers:
+	make -C 3scale container
+	make -C appservice container
 
 run:
-	podman run --rm -p $(PORT):443 $(CONTAINER_NAME)
+	podman network create $(NETWORK)
+	sed -e "s%XDG_RUNTIME_DIR%$${XDG_RUNTIME_DIR}%" webconsoledot-local.yaml | podman play kube --network $(NETWORK) -
 
-all: certs container
+clean:
+	podman network rm --time 0 --force $(NETWORK)
+
+all: containers

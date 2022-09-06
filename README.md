@@ -7,13 +7,17 @@ basic auth username and password is `admin:foobar`.
 Creating the container, requires `podman` and `sscg` to be available on the host.
 
 ```
-make container
+make containers
 ```
 
-To run the container:
+To run the cloud:
 
 ```
 make run
 ```
 
-To configure the port pass `PORT=8080` to `make run`.
+Cleaning up:
+
+```
+make clean
+```
