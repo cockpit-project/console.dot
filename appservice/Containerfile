@@ -1,0 +1,9 @@
+FROM debian:bookworm
+
+RUN apt update
+RUN apt install -y python3 python3-redis nginx curl inetutils-ping procps
+
+COPY multiplexer.py /usr/local/bin/multiplexer.py
+
+# CMD sleep infinity
+CMD python3 /usr/local/bin/multiplexer.py
