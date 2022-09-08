@@ -25,6 +25,12 @@ spec:
     - name: redis
       image: docker.io/redis:latest
 
+    - name: 3scale
+      image: localhost/3scale:latest
+      ports:
+        - containerPort: 443
+          hostPort: 8443
+
   volumes:
     - name: podman-socket
       hostPath:
@@ -33,21 +39,3 @@ spec:
     - name: multiplexer.py
       hostPath:
         path: ./appservice/multiplexer.py
-
----
-
-apiVersion: v1
-kind: Pod
-
-metadata:
-  name: 3scale
-  labels:
-    app: 3scale
-
-spec:
-  containers:
-    - name: nginx
-      image: localhost/3scale:latest
-      ports:
-        - containerPort: 443
-          hostPort: 8443

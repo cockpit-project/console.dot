@@ -44,12 +44,12 @@ http {{
 
         {routes}
 
-        location /register {{
+        location /api/webconsole/v1/sessions/new {{
             proxy_pass http://localhost:8081;
         }}
 
         location / {{
-            return 404 'not a teapot';
+            return 404 'no route found in multiplexer \r\n';
         }}
       }}
 }}
@@ -95,7 +95,7 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
     # protocol_version = 'HTTP/1.0'
 
     def do_GET(self):
-        if self.path == "/register":
+        if self.path == "/api/webconsole/v1/sessions/new":
             sessionid = str(uuid.uuid4())
             name = f'session-{sessionid}'
             connection = http.client.HTTPConnection('localhost')
