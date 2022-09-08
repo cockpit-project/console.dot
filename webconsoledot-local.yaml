@@ -18,6 +18,9 @@ spec:
       volumeMounts:
         - mountPath: /run/podman/podman.sock
           name: podman-socket
+        - mountPath: /usr/local/bin/multiplexer.py
+          name: multiplexer.py
+          readOnly: true
 
     - name: redis
       image: docker.io/redis:latest
@@ -26,6 +29,10 @@ spec:
     - name: podman-socket
       hostPath:
         path: XDG_RUNTIME_DIR/podman/podman.sock
+
+    - name: multiplexer.py
+      hostPath:
+        path: ./appservice/multiplexer.py
 
 ---
 
