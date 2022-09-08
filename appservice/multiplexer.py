@@ -37,8 +37,8 @@ http {{
 
     keepalive_timeout  65;
 
-	server {{
-	    listen   80;
+    server {{
+        listen   80;
 
         server_name localhost;
 
@@ -83,10 +83,40 @@ def write_routes(sessions):
     routes = ""
     for sessionid in sessions:
         routes += f"""
-            location /session/{sessionid} {{
-                proxy_pass http://session-{sessionid}:9090/api/cockpit-9090/{sessionid};
-            }}
-    """
+location /wss/webconsole-http/v1/sessions/{sessionid} {{
+    proxy_pass http://session-{sessionid}:9090/wss/webconsole-http/v1/sessions/{sessionid};
+
+    # Required to proxy the connection to Cockpit
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Required for web sockets to function
+    proxy_http_version 1.1;
+    proxy_buffering off;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+    # Pass ETag header from Cockpit to clients.
+    # See: https://github.com/cockpit-project/cockpit/issues/5239
+    gzip off;
+}}
+location /wss/webconsole-ws/v1/sessions/{sessionid} {{
+    proxy_pass http://session-{sessionid}:8080/wss/webconsole-ws/v1/sessions/{sessionid};
+
+    # Required to proxy the connection to Cockpit
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Required for web sockets to function
+    proxy_http_version 1.1;
+    proxy_buffering off;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+    # Pass ETag header from Cockpit to clients.
+    # See: https://github.com/cockpit-project/cockpit/issues/5239
+    gzip off;
+}}"""
 
     open('/etc/nginx/nginx.conf', 'w').write(NGINX_TEMPLATE.format(routes=routes))
 
@@ -104,7 +134,10 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
             body = {
                     'image': 'quay.io/rhn_engineering_mpitt/ws',
                     'name': name,
-                    'command': ['sleep', 'infinity'],
+                    # for local debugging
+                    #'command': ['sleep', 'infinity'],
+                    # XXX: http://localhost:8080 origin is for directly connecting to appservice, without 3scale
+                    'command': ['sh', '-exc', f"printf '[Webservice]\nUrlRoot=/wss/webconsole-http/v1/sessions/{sessionid}/\\nOrigins = https://localhost:8443 http://localhost:8080\\n' > /etc/cockpit/cockpit.conf; exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
                     'remove': True,
                     'netns': {'nsmode': 'bridge'},
                     'Networks': {'consoledot': {}},
