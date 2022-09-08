@@ -3,10 +3,11 @@ NETWORK=consoledot
 
 .PHONY: containers
 containers:
-	make -C 3scale container
-	make -C appservice container
+	$(MAKE) -C 3scale container
+	$(MAKE) -C appservice container
 
 run:
+	[ -z "$$(podman network ls --quiet --filter 'name=consoledot')" ] || $(MAKE) clean
 	podman network create $(NETWORK)
 	sed -e "s%XDG_RUNTIME_DIR%$${XDG_RUNTIME_DIR}%" webconsoledot-local.yaml | podman play kube --network $(NETWORK) -
 
