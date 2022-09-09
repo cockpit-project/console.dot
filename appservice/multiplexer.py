@@ -204,6 +204,8 @@ def watch_redis():
 if __name__ == '__main__':
     write_routes(get_sessions())
     proc = subprocess.Popen(['nginx'])
+    # HACK: TODO: nginx often dies without this, figure out why
+    time.sleep(1)
     NGINX_PID = proc.pid
 
     logging.basicConfig(level=logging.DEBUG)
