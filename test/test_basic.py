@@ -54,3 +54,25 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(response.status, 200)
         sessionid = json.load(response)['id']
         self.assertIsInstance(sessionid, str)
+
+        podman = ['podman', 'run', '-d', '--pod', 'webconsoleapp', '--network', 'consoledot', 'localhost/webconsoleserver']
+        cmd = ['websocat', '--basic-auth', 'admin:foobar', '-b', '-k',
+               f'wss://host.containers.internal:8443/wss/webconsole-ws/v1/sessions/{sessionid}',
+               'cmd:cockpit-bridge']
+        subprocess.check_call(podman + cmd)
+
+        # Shell
+        url = f'https://localhost:8443/wss/webconsole-http/v1/sessions/{sessionid}/'
+        response = self.request(url)
+        self.assertEqual(response.status, 200)
+        content = response.read()
+        self.assertIn(b'base1/cockpit.js', content)
+        self.assertIn(b'id="topnav"', content)
+
+        # Overview frame
+        url = f'https://localhost:8443/wss/webconsole-http/v1/sessions/{sessionid}/cockpit/@localhost/system/index.html'
+        response = self.request(url)
+        self.assertEqual(response.status, 200)
+        content = response.read()
+        self.assertIn(b'base1/cockpit.js', content)
+        self.assertIn(b'Overview', content)
