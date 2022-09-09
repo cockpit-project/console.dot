@@ -7,11 +7,16 @@ import http
 import http.client
 import json
 import time
+import logging
 
 import redis
 
 from multiprocessing import Process
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+
+logger = logging.getLogger("multiplexer")
+
 
 NGINX_TEMPLATE = """
 daemon off;
@@ -146,7 +151,7 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         connection.request('POST', '/v1.12/libpod/containers/create', body=json.dumps(body))
         response = connection.getresponse()
         content = response.read()
-        print(response.status, content)
+        logger.debug("/new: creating container result: %i %s", response.status, content.decode())
         connection.request('POST', f'/v1.12/libpod/containers/{name}/start')
         response = connection.getresponse()
 
@@ -184,11 +189,12 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
 def watch_redis():
     redis = REDIS.pubsub()
     redis.subscribe("sessions")
+    logger = logging.getLogger("multiplexer/redis")
 
     while True:
         message = redis.get_message()
         if message:
-            print(message)
+            logger.debug("got message: %s", message)
             sessions = get_sessions()
             write_routes(sessions)
             os.kill(NGINX_PID, signal.SIGHUP)
@@ -198,12 +204,9 @@ def watch_redis():
 if __name__ == '__main__':
     write_routes(get_sessions())
     proc = subprocess.Popen(['nginx'])
-    status = proc.poll()
-    print("nginx status", status)
-    time.sleep(1)
-    status = proc.poll()
-    print("nginx status", status)
     NGINX_PID = proc.pid
+
+    logging.basicConfig(level=logging.DEBUG)
 
     # start redis watcher
     redis = Process(target=watch_redis)
