@@ -124,48 +124,50 @@ location /wss/webconsole-ws/v1/sessions/{sessionid} {{
 class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
     # protocol_version = 'HTTP/1.0'
 
+    def new_session(self):
+        sessionid = str(uuid.uuid4())
+        name = f'session-{sessionid}'
+        connection = http.client.HTTPConnection('localhost')
+        connection.sock = socket.socket(socket.AF_UNIX)
+        connection.sock.connect(PODMAN_SOCKET)
+        body = {
+                'image': 'quay.io/rhn_engineering_mpitt/ws',
+                'name': name,
+                # for local debugging
+                #'command': ['sleep', 'infinity'],
+                # XXX: http://localhost:8080 origin is for directly connecting to appservice, without 3scale
+                'command': ['sh', '-exc', f"printf '[Webservice]\nUrlRoot=/wss/webconsole-http/v1/sessions/{sessionid}/\\nOrigins = https://localhost:8443 http://localhost:8080\\n' > /etc/cockpit/cockpit.conf; exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
+                'remove': True,
+                'netns': {'nsmode': 'bridge'},
+                'Networks': {'consoledot': {}},
+        }
+        connection.request('POST', '/v1.12/libpod/containers/create', body=json.dumps(body))
+        response = connection.getresponse()
+        content = response.read()
+        print(response.status, content)
+        connection.request('POST', f'/v1.12/libpod/containers/{name}/start')
+        response = connection.getresponse()
+
+        sessions = get_sessions()
+        sessions[sessionid] = True
+
+        dumped_sessions = json.dumps(sessions)
+        REDIS.set('sessions', dumped_sessions)
+        REDIS.publish('sessions', dumped_sessions)
+
+        self.send_response(200)
+        self.end_headers()
+        if response.status != 200:
+            self.wfile.write(content)
+        else:
+            self.wfile.write(f"container created {name}\r\n".encode('utf-8'))
+
     def do_GET(self):
         if self.path == "/api/webconsole/v1/sessions/new":
-            sessionid = str(uuid.uuid4())
-            name = f'session-{sessionid}'
-            connection = http.client.HTTPConnection('localhost')
-            connection.sock = socket.socket(socket.AF_UNIX)
-            connection.sock.connect(PODMAN_SOCKET)
-            body = {
-                    'image': 'quay.io/rhn_engineering_mpitt/ws',
-                    'name': name,
-                    # for local debugging
-                    #'command': ['sleep', 'infinity'],
-                    # XXX: http://localhost:8080 origin is for directly connecting to appservice, without 3scale
-                    'command': ['sh', '-exc', f"printf '[Webservice]\nUrlRoot=/wss/webconsole-http/v1/sessions/{sessionid}/\\nOrigins = https://localhost:8443 http://localhost:8080\\n' > /etc/cockpit/cockpit.conf; exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
-                    'remove': True,
-                    'netns': {'nsmode': 'bridge'},
-                    'Networks': {'consoledot': {}},
-            }
-            connection.request('POST', '/v1.12/libpod/containers/create', body=json.dumps(body))
-            response = connection.getresponse()
-            content = response.read()
-            print(response.status, content)
-            connection.request('POST', f'/v1.12/libpod/containers/{name}/start')
-            response = connection.getresponse()
+            self.new_session()
+        else:
+            self.send_response(404, 'Not found')
 
-            sessions = get_sessions()
-            sessions[sessionid] = True
-
-            dumped_sessions = json.dumps(sessions)
-            REDIS.set('sessions', dumped_sessions)
-            REDIS.publish('sessions', dumped_sessions)
-
-            self.send_response(200)
-            self.end_headers()
-            if response.status != 200:
-                self.wfile.write(content)
-            else:
-                self.wfile.write(f"container created {name}\r\n".encode('utf-8'))
-
-            return
-
-        self.send_response(404, 'Not found')
 
 def watch_redis():
     p = REDIS.pubsub()
