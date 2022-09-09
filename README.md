@@ -63,3 +63,8 @@ This requires `podman` and `sscg` to be available on the host.
    ```
    make clean
    ```
+
+ - Run the integration tests:
+   ```
+   make check
+   ```
