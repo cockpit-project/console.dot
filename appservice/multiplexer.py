@@ -155,12 +155,15 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         REDIS.set('sessions', dumped_sessions)
         REDIS.publish('sessions', dumped_sessions)
 
-        self.send_response(200)
-        self.end_headers()
-        if response.status != 200:
-            self.wfile.write(content)
+        if response.status >= 200 and response.status < 300:
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(json.dumps({ "id": sessionid }).encode())
         else:
-            self.wfile.write(f"container created {name}\r\n".encode('utf-8'))
+            self.send_response(response.status)
+            self.end_headers()
+            self.wfile.write(f"creating container failed: ".encode())
+            self.wfile.write(content)
 
     def do_GET(self):
         if self.path == "/api/webconsole/v1/sessions/new":
