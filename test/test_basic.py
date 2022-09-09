@@ -48,7 +48,7 @@ class IntegrationTest(unittest.TestCase):
             time.sleep(1)
             tries += 1
 
-        assert "timeout reached trying to request an URL"
+        self.fail(f"timeout reached trying to request {url}")
 
     def testBasic(self):
         response = self.request('https://localhost:8443/api/webconsole/v1/sessions/new')
