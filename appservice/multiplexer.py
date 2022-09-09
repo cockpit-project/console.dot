@@ -134,9 +134,12 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
                 'image': 'quay.io/rhn_engineering_mpitt/ws',
                 'name': name,
                 # for local debugging
-                #'command': ['sleep', 'infinity'],
+                # 'command': ['sleep', 'infinity'],
                 # XXX: http://localhost:8080 origin is for directly connecting to appservice, without 3scale
-                'command': ['sh', '-exc', f"printf '[Webservice]\nUrlRoot=/wss/webconsole-http/v1/sessions/{sessionid}/\\nOrigins = https://localhost:8443 http://localhost:8080\\n' > /etc/cockpit/cockpit.conf; exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
+                'command': ['sh', '-exc',
+                            f"printf '[Webservice]\nUrlRoot=/wss/webconsole-http/v1/sessions/{sessionid}/\\n"
+                            "Origins = https://localhost:8443 http://localhost:8080\\n' > /etc/cockpit/cockpit.conf;"
+                            "exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
                 'remove': True,
                 'netns': {'nsmode': 'bridge'},
                 'Networks': {'consoledot': {}},
@@ -158,11 +161,11 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         if response.status >= 200 and response.status < 300:
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(json.dumps({ "id": sessionid }).encode())
+            self.wfile.write(json.dumps({"id": sessionid}).encode())
         else:
             self.send_response(response.status)
             self.end_headers()
-            self.wfile.write(f"creating container failed: ".encode())
+            self.wfile.write("creating container failed: ".encode())
             self.wfile.write(content)
 
     def ping(self):
