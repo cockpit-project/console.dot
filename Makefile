@@ -1,5 +1,6 @@
 NETWORK = consoledot
 CONTAINER_NAME = webconsoleapp
+SERVER_CONTAINER_NAME = webconsoleserver
 
 build: 3scale/certs/service-chain.pem containers
 
@@ -9,6 +10,7 @@ build: 3scale/certs/service-chain.pem containers
 
 containers:
 	podman build -t $(CONTAINER_NAME) appservice
+	podman build -t $(SERVER_CONTAINER_NAME) server
 	podman pull quay.io/rhn_engineering_mpitt/ws
 
 run: 3scale/certs/service-chain.pem
