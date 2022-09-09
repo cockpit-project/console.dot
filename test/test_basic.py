@@ -19,7 +19,7 @@ class IntegrationTest(unittest.TestCase):
         subprocess.check_call(["make"], cwd=projroot)
         subprocess.check_call(["make", "run"], cwd=projroot)
         # Wait until the appservice container is up
-        self.context = ssl.create_default_context(cafile=os.path.join(projroot, '3scale', 'certs', 'ca.crt'))
+        self.ssl_3scale = ssl.create_default_context(cafile=os.path.join(projroot, '3scale', 'certs', 'ca.crt'))
         self.request('https://localhost:8443/api/webconsole/v1/ping', retries=20)
 
     def tearDown(self):
@@ -34,7 +34,7 @@ class IntegrationTest(unittest.TestCase):
 
         while tries <= retries:
             try:
-                response = urllib.request.urlopen(request, context=self.context, timeout=1)
+                response = urllib.request.urlopen(request, context=self.ssl_3scale, timeout=1)
                 if response.status >= 200 and response.status < 300:
                     return response
             except urllib.error.HTTPError as exc:
