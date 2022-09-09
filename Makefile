@@ -9,6 +9,7 @@ build: 3scale/certs/service-chain.pem containers
 
 containers:
 	podman build -t $(CONTAINER_NAME) appservice
+	podman pull quay.io/rhn_engineering_mpitt/ws
 
 run: 3scale/certs/service.pem
 	[ -z "$$(podman network ls --quiet --filter 'name=$(NETWORK)')" ] || $(MAKE) clean
