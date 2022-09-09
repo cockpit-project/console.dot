@@ -12,5 +12,8 @@ jobs:
       - name: Clone repository
         uses: actions/checkout@v2
 
+      - name: Build containers and credentials
+        run: make
+
       - name: Run test
         run: make check
