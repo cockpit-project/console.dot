@@ -58,8 +58,7 @@ http {{
 PODMAN_SOCKET = '/run/podman/podman.sock'
 # redis hostname - pod name - container name
 REDIS_HOST = 'webconsoleapp-redis'
-# nginx PID
-PID = 0
+NGINX_PID = 0
 # Pods
 SESSIONS = {}
 REDIS = redis.Redis(host=REDIS_HOST)
@@ -183,16 +182,16 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
 
 
 def watch_redis():
-    p = REDIS.pubsub()
-    p.subscribe("sessions")
+    redis = REDIS.pubsub()
+    redis.subscribe("sessions")
 
     while True:
-        message = p.get_message()
+        message = redis.get_message()
         if message:
             print(message)
             sessions = get_sessions()
             write_routes(sessions)
-            os.kill(PID, signal.SIGHUP)
+            os.kill(NGINX_PID, signal.SIGHUP)
         time.sleep(0.01)
 
 
@@ -204,13 +203,13 @@ if __name__ == '__main__':
     time.sleep(1)
     status = proc.poll()
     print("nginx status", status)
-    PID = proc.pid
-    server_address = ('0.0.0.0', 8081)
+    NGINX_PID = proc.pid
 
     # start redis watcher
-    p = Process(target=watch_redis)
-    p.start()
+    redis = Process(target=watch_redis)
+    redis.start()
 
+    server_address = ('0.0.0.0', 8081)
     httpd = HTTPServer(server_address, ProxyHTTPRequestHandler)
     try:
         httpd.serve_forever()
