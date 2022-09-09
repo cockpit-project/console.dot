@@ -11,7 +11,7 @@ containers:
 	podman build -t $(CONTAINER_NAME) appservice
 	podman pull quay.io/rhn_engineering_mpitt/ws
 
-run: 3scale/certs/service.pem
+run: 3scale/certs/service-chain.pem
 	[ -z "$$(podman network ls --quiet --filter 'name=$(NETWORK)')" ] || $(MAKE) clean
 	podman network create $(NETWORK)
 	[ $$(id -u) -eq 0 ] && systemctl start podman.socket || systemctl --user start podman.socket
