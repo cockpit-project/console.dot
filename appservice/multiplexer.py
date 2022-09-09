@@ -44,7 +44,7 @@ http {{
 
         {routes}
 
-        location /api/webconsole/v1/sessions/new {{
+        location /api/webconsole/ {{
             proxy_pass http://localhost:8081;
         }}
 
@@ -165,9 +165,16 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(f"creating container failed: ".encode())
             self.wfile.write(content)
 
+    def ping(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'pong')
+
     def do_GET(self):
         if self.path == "/api/webconsole/v1/sessions/new":
             self.new_session()
+        if self.path == "/api/webconsole/v1/ping":
+            self.ping()
         else:
             self.send_response(404, 'Not found')
 

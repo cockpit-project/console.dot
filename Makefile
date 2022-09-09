@@ -14,6 +14,9 @@ run:
 clean:
 	podman network rm --time 0 --force $(NETWORK)
 
+check:
+	python3 -m unittest discover -vs test
+
 all: containers
 
 .PHONY: containers run clean all
