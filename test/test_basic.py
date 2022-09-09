@@ -16,7 +16,7 @@ projroot = os.path.dirname(os.path.dirname(__file__))
 class IntegrationTest(unittest.TestCase):
 
     def setUp(self):
-        subprocess.check_call(["make", "containers"], cwd=projroot)
+        subprocess.check_call(["make"], cwd=projroot)
         subprocess.check_call(["make", "run"], cwd=projroot)
         # Wait until the appservice container is up
         self.context = ssl.create_default_context(cafile=os.path.join(projroot, '3scale', 'certs', 'ca.crt'))

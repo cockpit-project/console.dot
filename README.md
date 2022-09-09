@@ -17,9 +17,9 @@ This requires `podman` and `sscg` to be available on the host.
 
 ## Usage
 
- - Build the containers:
+ - Build the credentials and custom container:
    ```
-   make containers
+   make
    ```
 
  - Run the 3scale and app service containers:

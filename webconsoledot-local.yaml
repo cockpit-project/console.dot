@@ -26,10 +26,17 @@ spec:
       image: docker.io/redis:latest
 
     - name: 3scale
-      image: localhost/3scale:latest
+      image: docker.io/library/nginx
       ports:
         - containerPort: 443
           hostPort: 8443
+      volumeMounts:
+        - mountPath: /etc/nginx/nginx.conf
+          name: 3scale-nginx.conf
+        - mountPath: /etc/nginx/certs/
+          name: 3scale-certs
+        - mountPath: /etc/nginx/.htpasswd
+          name: 3scale-htpasswd
 
   volumes:
     - name: podman-socket
@@ -39,3 +46,15 @@ spec:
     - name: multiplexer.py
       hostPath:
         path: ./appservice/multiplexer.py
+
+    - name: 3scale-nginx.conf
+      hostPath:
+        path: ./3scale/nginx.conf
+
+    - name: 3scale-certs
+      hostPath:
+        path: ./3scale/certs/
+
+    - name: 3scale-htpasswd
+      hostPath:
+        path: ./3scale/htpasswd

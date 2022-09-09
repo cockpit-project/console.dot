@@ -1,10 +1,16 @@
 NETWORK = consoledot
+CONTAINER_NAME = webconsoleapp
+
+build: 3scale/certs/service-chain.pem containers
+
+3scale/certs/service-chain.pem:
+	mkdir -p 3scale/certs && cd 3scale/certs && sscg
+	cat 3scale/certs/service.pem 3scale/certs/ca.crt > $@
 
 containers:
-	$(MAKE) -C 3scale container
-	$(MAKE) -C appservice container
+	podman build -t $(CONTAINER_NAME) appservice
 
-run:
+run: 3scale/certs/service.pem
 	[ -z "$$(podman network ls --quiet --filter 'name=$(NETWORK)')" ] || $(MAKE) clean
 	podman network create $(NETWORK)
 	[ $$(id -u) -eq 0 ] && systemctl start podman.socket || systemctl --user start podman.socket
