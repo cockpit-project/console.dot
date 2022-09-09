@@ -29,7 +29,7 @@ This requires `podman` and `sscg` to be available on the host.
 
  - Register a new session:
    ```
-   curl -u admin:foobar -k https://localhost:8443/api/webconsole/v1/sessions/new
+   curl -u admin:foobar --cacert 3scale/certs/ca.crt https://localhost:8443/api/webconsole/v1/sessions/new
    ```
 
    This returns the session ID in a JSON object:

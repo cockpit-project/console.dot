@@ -4,7 +4,7 @@ CONTAINER_NAME = webconsoleapp
 build: 3scale/certs/service-chain.pem containers
 
 3scale/certs/service-chain.pem:
-	mkdir -p 3scale/certs && cd 3scale/certs && sscg
+	mkdir -p 3scale/certs && cd 3scale/certs && sscg --subject-alt-name localhost
 	cat 3scale/certs/service.pem 3scale/certs/ca.crt > $@
 
 containers:

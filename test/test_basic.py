@@ -20,7 +20,6 @@ class IntegrationTest(unittest.TestCase):
         subprocess.check_call(["make", "run"], cwd=projroot)
         # Wait until the appservice container is up
         self.context = ssl.create_default_context(cafile=os.path.join(projroot, '3scale', 'certs', 'ca.crt'))
-        self.context.check_hostname = False
         self.request('https://localhost:8443/api/webconsole/v1/ping', retries=20)
 
     def tearDown(self):
