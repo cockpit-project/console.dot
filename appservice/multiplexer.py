@@ -20,7 +20,6 @@ logger = logging.getLogger("multiplexer")
 
 NGINX_TEMPLATE = """
 daemon off;
-user www-data;
 worker_processes  auto;
 
 events {{
