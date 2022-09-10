@@ -1,13 +1,27 @@
-FROM docker.io/redhat/ubi9-minimal
+### builder container
+FROM docker.io/redhat/ubi9-minimal as builder
 
-# iputils and procps-ng are just for debugging; drop for production
-RUN microdnf install -y python3-pip iputils procps-ng && microdnf clean all
+RUN microdnf install -y python3-pip
+
+RUN source /etc/os-release && \
+    microdnf install -y --releasever=$VERSION_ID --setopt=install_weak_deps=0 --installroot=/build \
+    coreutils-single python3
+
 # cockpit is not available in UBI, install from CentOS 9 stream; c-bridge is just for debugging, drop for production
-RUN printf '[c9s]\nname = C9S\nbaseurl = http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os\ngpgcheck = 0\n' > /etc/yum.repos.d/c9s.repo
-RUN microdnf install --enablerepo=c9s --setopt=install_weak_deps=0 -y cockpit-ws cockpit-bridge && microdnf clean all
+RUN printf '[c9s]\nname = C9S\nbaseurl = http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os\ngpgcheck = 0\n' > /build/etc/yum.repos.d/c9s.repo
+RUN microdnf install -y --releasever=$VERSION_ID --setopt=install_weak_deps=0 --installroot=/build \
+    --enablerepo=c9s cockpit-ws cockpit-bridge
 
-RUN pip3 install redis starlette httpx websockets uvicorn
+RUN pip3 install --prefix /build redis starlette httpx websockets uvicorn
 
+# avoid unnecessary stuff in the container; systemd is a protected package, so apply some extra force
+RUN rpm --root=/build --verbose --erase --nodeps systemd systemd-pam dbus dbus-broker
+RUN rm -r /build/var/cache/dnf /build/var/lib/dnf /build/var/lib/rpm*
+
+### output container
+
+FROM scratch
+COPY --from=builder /build /
 COPY *.py /usr/local/bin/
 COPY scripts /
 
