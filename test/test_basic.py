@@ -20,7 +20,7 @@ class IntegrationTest(unittest.TestCase):
             subprocess.check_call(["make", "run"], cwd=projroot)
             # Wait until the appservice container is up
             self.ssl_3scale = ssl.create_default_context(cafile=os.path.join(projroot, '3scale', 'certs', 'ca.crt'))
-            self.request('https://localhost:8443/api/webconsole/v1/ping', retries=20)
+            self.request('https://localhost:8443/api/webconsole/v1/ping', retries=5)
         except (subprocess.CalledProcessError, AssertionError, IOError, OSError):
             self.dumpLogs()
             raise
