@@ -24,7 +24,9 @@ spec:
           readOnly: true
       env:
         - name: REDIS_HOSTNAME
-          value: "webconsoleapp-redis"
+          # HACK: podman < 4 cannot DNS-resolve container names in pod, so use pod name
+          # value: "webconsoleapp-redis"
+          value: "webconsoleapp"
 
     - name: redis
       image: docker.io/redis:latest
