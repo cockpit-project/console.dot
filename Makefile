@@ -20,8 +20,13 @@ run: 3scale/certs/service-chain.pem
 	[ $$(id -u) -ne 0 ] || XDG_RUNTIME_DIR=/run; \
 	sed -e "s%XDG_RUNTIME_DIR%$${XDG_RUNTIME_DIR}%" webconsoledot-local.yaml | podman play kube --network $(NETWORK) -
 
+# --time only supported in podman >= 4
 clean:
-	podman network rm --time 0 --force $(NETWORK)
+	if podman network rm --help | grep -q -- --time; then \
+	    podman network rm --time 0 --force $(NETWORK); \
+	else \
+	    podman network rm --force $(NETWORK); \
+	fi
 
 check:
 	python3 -m unittest discover -vs test
