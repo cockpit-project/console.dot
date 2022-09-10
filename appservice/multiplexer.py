@@ -61,12 +61,10 @@ http {{
 """
 
 PODMAN_SOCKET = '/run/podman/podman.sock'
-# redis hostname - pod name - container name
-REDIS_HOST = 'webconsoleapp-redis'
 NGINX_PID = 0
 # Pods
 SESSIONS = {}
-REDIS = redis.Redis(host=REDIS_HOST)
+REDIS = redis.Redis(host=os.environ["REDIS_HOSTNAME"])
 
 
 def get_sessions():
