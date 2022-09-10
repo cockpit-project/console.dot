@@ -54,14 +54,14 @@ http {{
         }}
 
         location / {{
-            return 404 'no route found in multiplexer \r\n';
+            return 404 'no route found in multiplexer\r\n';
         }}
       }}
 }}
 """
 
 PODMAN_SOCKET = '/run/podman/podman.sock'
-NGINX_PID = 0
+NGINX_PROC = None
 # Pods
 SESSIONS = {}
 REDIS = redis.Redis(host=os.environ["REDIS_HOSTNAME"])
@@ -196,18 +196,30 @@ def watch_redis():
             logger.debug("got message: %s", message)
             sessions = get_sessions()
             write_routes(sessions)
-            os.kill(NGINX_PID, signal.SIGHUP)
+            os.kill(NGINX_PROC.pid, signal.SIGHUP)
         time.sleep(0.01)
 
 
-if __name__ == '__main__':
-    write_routes(get_sessions())
+def start_nginx():
     proc = subprocess.Popen(['nginx'])
-    # HACK: TODO: nginx often dies without this, figure out why
-    time.sleep(1)
-    NGINX_PID = proc.pid
 
+    # wait for nginx to start up
+    connection = http.client.HTTPConnection('localhost')
+    for _ in range(10):
+        try:
+            connection.connect()
+            break
+        except OSError:
+            time.sleep(0.2)
+    else:
+        raise TimeoutError('timed out waiting for nginx to start up')
+    return proc
+
+
+if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
+    write_routes(get_sessions())
+    NGINX_PROC = start_nginx()
 
     # start redis watcher
     redis = Process(target=watch_redis)
@@ -218,5 +230,5 @@ if __name__ == '__main__':
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        proc.kill()
-        proc.wait()
+        NGINX_PROC.kill()
+        NGINX_PROC.wait()
