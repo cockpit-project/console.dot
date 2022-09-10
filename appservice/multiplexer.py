@@ -144,7 +144,8 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
                             "exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
                 'remove': True,
                 'netns': {'nsmode': 'bridge'},
-                'Networks': {'consoledot': {}},
+                # deprecated; use this with podman ≥ 4: 'Networks': {'consoledot': {}},
+                'cni_networks': ['consoledot'],
         }
         connection.request('POST', '/v1.12/libpod/containers/create', body=json.dumps(body))
         response = connection.getresponse()
