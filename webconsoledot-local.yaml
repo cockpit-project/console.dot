@@ -9,6 +9,7 @@ metadata:
     app: multiplexer
 
 spec:
+  restartPolicy: Never
   containers:
     - name: front-end
       image: localhost/webconsoleapp:latest
