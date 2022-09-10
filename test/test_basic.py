@@ -16,12 +16,40 @@ projroot = os.path.dirname(os.path.dirname(__file__))
 class IntegrationTest(unittest.TestCase):
 
     def setUp(self):
-        subprocess.check_call(["make", "run"], cwd=projroot)
-        # Wait until the appservice container is up
-        self.ssl_3scale = ssl.create_default_context(cafile=os.path.join(projroot, '3scale', 'certs', 'ca.crt'))
-        self.request('https://localhost:8443/api/webconsole/v1/ping', retries=20)
+        try:
+            subprocess.check_call(["make", "run"], cwd=projroot)
+            # Wait until the appservice container is up
+            self.ssl_3scale = ssl.create_default_context(cafile=os.path.join(projroot, '3scale', 'certs', 'ca.crt'))
+            self.request('https://localhost:8443/api/webconsole/v1/ping', retries=20)
+        except (subprocess.CalledProcessError, AssertionError, IOError, OSError):
+            self.dumpLogs()
+            raise
+
+    def dumpLogs(self):
+        ids = set(subprocess.check_output(
+            ['podman', 'ps', '--all', '--quiet', '--filter', 'pod=webconsoleapp'],
+            universal_newlines=True).split())
+        ids.update(subprocess.check_output(
+            ['podman', 'ps', '--all', '--quiet', '--filter', 'network=consoledot'],
+            universal_newlines=True).split())
+        for id in ids:
+            print('======')
+            subprocess.call(['podman', 'ps', '--noheading', '--all', '--filter', f'id={id}'])
+            subprocess.call(['podman', 'logs', id])
 
     def tearDown(self):
+        if hasattr(self._outcome, 'errors'):
+            # Python 3.4 - 3.10  (These two methods have no side effects)
+            result = self.defaultTestResult()
+            self._feedErrorsToResult(result, self._outcome.errors)
+        else:
+            # Python 3.11+
+            result = self._outcome.result
+        ok = all(test != self for test, text in result.errors + result.failures)
+
+        if not ok:
+            self.dumpLogs()
+
         subprocess.check_call(["make", "clean"], cwd=projroot)
 
     def request(self, url, retries=0):
