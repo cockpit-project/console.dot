@@ -1,13 +1,13 @@
-name: test
+name: ci
 on: [pull_request]
 jobs:
-  integration:
+  tests:
     runs-on: ubuntu-22.04
     steps:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y sscg
+          sudo apt-get install -y sscg flake8
 
       - name: Clone repository
         uses: actions/checkout@v2
@@ -15,5 +15,8 @@ jobs:
       - name: Build containers and credentials
         run: make
 
-      - name: Run test
+      - name: Run integration test
         run: make check
+
+      - name: flake8
+        run: flake8
