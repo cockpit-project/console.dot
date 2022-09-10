@@ -49,6 +49,8 @@ class IntegrationTest(unittest.TestCase):
 
         if not ok:
             self.dumpLogs()
+            if os.getenv('TEST_SIT'):
+                input("TEST FAILURE --investigate and press Enter to clean up")
 
         subprocess.check_call(["make", "clean"], cwd=projroot)
 
