@@ -85,7 +85,8 @@ class IntegrationTest(unittest.TestCase):
         sessionid = json.load(response)['id']
         self.assertIsInstance(sessionid, str)
 
-        podman = ['podman', 'run', '-d', '--pod', 'webconsoleapp', '--network', 'consoledot', 'localhost/webconsoleserver']
+        podman = ['podman', 'run', '-d', '--pod', 'webconsoleapp',
+                  '--network', 'consoledot', 'localhost/webconsoleserver']
         cmd = ['websocat', '--basic-auth', 'admin:foobar', '-b', '-k',
                f'wss://host.containers.internal:8443/wss/webconsole-ws/v1/sessions/{sessionid}',
                'cmd:cockpit-bridge']
