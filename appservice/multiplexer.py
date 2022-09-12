@@ -123,10 +123,7 @@ location /wss/webconsole-ws/v1/sessions/{sessionid} {{
 
 
 class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
-    # protocol_version = 'HTTP/1.0'
-
-    def new_session(self):
-        sessionid = str(uuid.uuid4())
+    def new_session_podman(self, sessionid):
         name = f'session-{sessionid}'
         connection = http.client.HTTPConnection('localhost')
         connection.sock = socket.socket(socket.AF_UNIX)
@@ -149,16 +146,23 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         connection.request('POST', '/v1.12/libpod/containers/create', body=json.dumps(body))
         response = connection.getresponse()
         content = response.read()
-        logger.debug("/new: creating container result: %i %s", response.status, content.decode())
-        connection.request('POST', f'/v1.12/libpod/containers/{name}/start')
-        response = connection.getresponse()
 
-        sessions = get_sessions()
-        sessions[sessionid] = True
+        if response.status >= 200 and response.status < 300:
+            logger.debug("/new: creating container result: %i %s", response.status, content.decode())
+            connection.request('POST', f'/v1.12/libpod/containers/{name}/start')
+            response = connection.getresponse()
+            content = response.read()
 
-        dumped_sessions = json.dumps(sessions)
-        REDIS.set('sessions', dumped_sessions)
-        REDIS.publish('sessions', dumped_sessions)
+        return response, content
+
+    def new_session(self):
+        sessionid = str(uuid.uuid4())
+
+        if os.path.exists(PODMAN_SOCKET):
+            response, content = self.new_session_podman(sessionid)
+        else:
+            # TODO: support k8s API
+            raise NotImplementedError("cannot create sessions other than podman")
 
         if response.status >= 200 and response.status < 300:
             self.send_response(200)
@@ -167,8 +171,15 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         else:
             self.send_response(response.status)
             self.end_headers()
-            self.wfile.write("creating container failed: ".encode())
+            self.wfile.write("creating session container failed: ".encode())
             self.wfile.write(content)
+
+        sessions = get_sessions()
+        sessions[sessionid] = True
+
+        dumped_sessions = json.dumps(sessions)
+        REDIS.set('sessions', dumped_sessions)
+        REDIS.publish('sessions', dumped_sessions)
 
     def ping(self):
         self.send_response(200)
