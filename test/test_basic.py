@@ -36,6 +36,8 @@ class IntegrationTest(unittest.TestCase):
             print('======')
             subprocess.call(['podman', 'ps', '--noheading', '--all', '--filter', f'id={id}'])
             subprocess.call(['podman', 'logs', id])
+        if os.getenv('TEST_SIT'):
+            input("TEST FAILURE --investigate and press Enter to clean up")
 
     def tearDown(self):
         if hasattr(self._outcome, 'errors'):
@@ -49,8 +51,6 @@ class IntegrationTest(unittest.TestCase):
 
         if not ok:
             self.dumpLogs()
-            if os.getenv('TEST_SIT'):
-                input("TEST FAILURE --investigate and press Enter to clean up")
 
         subprocess.check_call(["make", "clean"], cwd=projroot)
 
