@@ -107,3 +107,16 @@ class IntegrationTest(unittest.TestCase):
         content = response.read()
         self.assertIn(b'base1/cockpit.js', content)
         self.assertIn(b'Overview', content)
+
+    def test3scaleErrors(self):
+        # unauthenticated
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            urllib.request.urlopen('https://localhost:8443/api/webconsole/v1/sessions/new',
+                                   context=self.ssl_3scale)
+        self.assertEqual(cm.exception.code, 401)
+        self.assertEqual(cm.exception.reason, 'Unauthorized')
+
+        # unknown path
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self.request('https://localhost:8443/bogus/blah')
+        self.assertEqual(cm.exception.code, 418)
