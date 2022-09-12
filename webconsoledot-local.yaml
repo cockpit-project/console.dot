@@ -27,6 +27,8 @@ spec:
           # HACK: podman < 4 cannot DNS-resolve container names in pod, so use pod name
           # value: "webconsoleapp-redis"
           value: "webconsoleapp"
+        - name: PORT_3SCALE
+          value: {PORT_3SCALE}
 
     - name: redis
       image: docker.io/redis:latest
@@ -35,7 +37,7 @@ spec:
       image: docker.io/library/nginx
       ports:
         - containerPort: 443
-          hostPort: 8443
+          hostPort: {PORT_3SCALE}
       volumeMounts:
         - mountPath: /etc/nginx/nginx.conf
           name: 3scale-nginx.conf

@@ -18,6 +18,7 @@ import config
 
 logger = logging.getLogger("multiplexer")
 
+PORT_3SCALE = os.getenv('PORT_3SCALE')
 
 NGINX_TEMPLATE = """
 daemon off;
@@ -138,7 +139,8 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
                 # XXX: http://localhost:8080 origin is for directly connecting to appservice, without 3scale
                 'command': ['sh', '-exc',
                             f"printf '[Webservice]\nUrlRoot={config.ROUTE_BROWSER}/sessions/{sessionid}/\\n"
-                            "Origins = https://localhost:8443 http://localhost:8080\\n' > /etc/cockpit/cockpit.conf;"
+                            f"Origins = https://localhost:{PORT_3SCALE} http://localhost:8080\\n'"
+                            "> /etc/cockpit/cockpit.conf;"
                             "exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
                 'remove': True,
                 'netns': {'nsmode': 'bridge'},
