@@ -47,7 +47,7 @@ spec:
   volumes:
     - name: podman-socket
       hostPath:
-        path: XDG_RUNTIME_DIR/podman/podman.sock
+        path: {XDG_RUNTIME_DIR}/podman/podman.sock
 
     - name: appservice-mod
       hostPath:
