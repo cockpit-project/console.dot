@@ -9,11 +9,12 @@ import json
 import time
 import logging
 
-import redis
-
 from multiprocessing import Process
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+import redis
+
+import config
 
 logger = logging.getLogger("multiplexer")
 
@@ -48,7 +49,7 @@ http {{
 
         {routes}
 
-        location /api/webconsole/ {{
+        location {route_control} {{
             proxy_pass http://localhost:8081;
         }}
 
@@ -84,8 +85,8 @@ def write_routes(sessions):
     routes = ""
     for sessionid in sessions:
         routes += f"""
-location /wss/webconsole-http/v1/sessions/{sessionid} {{
-    proxy_pass http://session-{sessionid}:9090/wss/webconsole-http/v1/sessions/{sessionid};
+location {config.ROUTE_BROWSER}/sessions/{sessionid} {{
+    proxy_pass http://session-{sessionid}:9090{config.ROUTE_BROWSER}/sessions/{sessionid};
 
     # Required to proxy the connection to Cockpit
     proxy_set_header Host $host;
@@ -101,8 +102,8 @@ location /wss/webconsole-http/v1/sessions/{sessionid} {{
     # See: https://github.com/cockpit-project/cockpit/issues/5239
     gzip off;
 }}
-location /wss/webconsole-ws/v1/sessions/{sessionid} {{
-    proxy_pass http://session-{sessionid}:8080/wss/webconsole-ws/v1/sessions/{sessionid};
+location {config.ROUTE_HOST}/sessions/{sessionid} {{
+    proxy_pass http://session-{sessionid}:8080{config.ROUTE_HOST}/sessions/{sessionid};
 
     # Required to proxy the connection to Cockpit
     proxy_set_header Host $host;
@@ -119,7 +120,8 @@ location /wss/webconsole-ws/v1/sessions/{sessionid} {{
     gzip off;
 }}"""
 
-    open('/etc/nginx/nginx.conf', 'w').write(NGINX_TEMPLATE.format(routes=routes))
+    with open('/etc/nginx/nginx.conf', 'w') as f:
+        f.write(NGINX_TEMPLATE.format(routes=routes, route_control=config.ROUTE_CONTROL))
 
 
 class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -135,7 +137,7 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
                 # 'command': ['sleep', 'infinity'],
                 # XXX: http://localhost:8080 origin is for directly connecting to appservice, without 3scale
                 'command': ['sh', '-exc',
-                            f"printf '[Webservice]\nUrlRoot=/wss/webconsole-http/v1/sessions/{sessionid}/\\n"
+                            f"printf '[Webservice]\nUrlRoot={config.ROUTE_BROWSER}/sessions/{sessionid}/\\n"
                             "Origins = https://localhost:8443 http://localhost:8080\\n' > /etc/cockpit/cockpit.conf;"
                             "exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
                 'remove': True,
@@ -187,9 +189,10 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(b'pong')
 
     def do_GET(self):
-        if self.path == "/api/webconsole/v1/sessions/new":
+        logger.debug("GET %s", self.path)
+        if self.path == f"{config.ROUTE_CONTROL}/sessions/new":
             self.new_session()
-        if self.path == "/api/webconsole/v1/ping":
+        if self.path == f"{config.ROUTE_CONTROL}/ping":
             self.ping()
         else:
             self.send_response(404, 'Not found')

@@ -19,8 +19,8 @@ spec:
       volumeMounts:
         - mountPath: /run/podman/podman.sock
           name: podman-socket
-        - mountPath: /usr/local/bin/multiplexer.py
-          name: multiplexer.py
+        - mountPath: /usr/local/bin/
+          name: appservice-mod
           readOnly: true
       env:
         - name: REDIS_HOSTNAME
@@ -49,9 +49,9 @@ spec:
       hostPath:
         path: XDG_RUNTIME_DIR/podman/podman.sock
 
-    - name: multiplexer.py
+    - name: appservice-mod
       hostPath:
-        path: ./appservice/multiplexer.py
+        path: ./appservice/
 
     - name: 3scale-nginx.conf
       hostPath:
