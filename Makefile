@@ -18,7 +18,7 @@ run: 3scale/certs/service-chain.pem
 	podman network create $(NETWORK)
 	[ $$(id -u) -eq 0 ] && systemctl start podman.socket || systemctl --user start podman.socket
 	[ $$(id -u) -ne 0 ] || XDG_RUNTIME_DIR=/run; \
-	sed -e "s%XDG_RUNTIME_DIR%$${XDG_RUNTIME_DIR}%" webconsoledot-local.yaml | podman play kube --network $(NETWORK) -
+	sed -e "s%{XDG_RUNTIME_DIR}%$${XDG_RUNTIME_DIR}%" webconsoledot-local.yaml | podman play kube --network $(NETWORK) -
 
 # --time only supported in podman >= 4
 clean:
