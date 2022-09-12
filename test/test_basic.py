@@ -10,6 +10,8 @@ import urllib.request
 import ssl
 import json
 
+from appservice import config
+
 projroot = os.path.dirname(os.path.dirname(__file__))
 
 
@@ -20,7 +22,7 @@ class IntegrationTest(unittest.TestCase):
             subprocess.check_call(["make", "run"], cwd=projroot)
             # Wait until the appservice container is up
             self.ssl_3scale = ssl.create_default_context(cafile=os.path.join(projroot, '3scale', 'certs', 'ca.crt'))
-            self.request('https://localhost:8443/api/webconsole/v1/ping', retries=5)
+            self.request(f'https://localhost:8443{config.ROUTE_CONTROL}/ping', retries=5)
         except (subprocess.CalledProcessError, AssertionError, IOError, OSError):
             self.dumpLogs()
             raise
@@ -80,7 +82,7 @@ class IntegrationTest(unittest.TestCase):
         self.fail(f"timeout reached trying to request {url}")
 
     def testBasic(self):
-        response = self.request('https://localhost:8443/api/webconsole/v1/sessions/new')
+        response = self.request(f'https://localhost:8443{config.ROUTE_CONTROL}/sessions/new')
         self.assertEqual(response.status, 200)
         sessionid = json.load(response)['id']
         self.assertIsInstance(sessionid, str)
@@ -88,12 +90,12 @@ class IntegrationTest(unittest.TestCase):
         podman = ['podman', 'run', '-d', '--pod', 'webconsoleapp',
                   '--network', 'consoledot', 'localhost/webconsoleserver']
         cmd = ['websocat', '--basic-auth', 'admin:foobar', '-b', '-k',
-               f'wss://host.containers.internal:8443/wss/webconsole-ws/v1/sessions/{sessionid}',
+               f'wss://host.containers.internal:8443{config.ROUTE_HOST}/sessions/{sessionid}',
                'cmd:cockpit-bridge']
         subprocess.check_call(podman + cmd)
 
         # Shell
-        url = f'https://localhost:8443/wss/webconsole-http/v1/sessions/{sessionid}/'
+        url = f'https://localhost:8443{config.ROUTE_BROWSER}/sessions/{sessionid}/'
         response = self.request(url)
         self.assertEqual(response.status, 200)
         content = response.read()
@@ -101,7 +103,7 @@ class IntegrationTest(unittest.TestCase):
         self.assertIn(b'id="topnav"', content)
 
         # Overview frame
-        url = f'https://localhost:8443/wss/webconsole-http/v1/sessions/{sessionid}/cockpit/@localhost/system/index.html'
+        url = f'https://localhost:8443{config.ROUTE_BROWSER}/sessions/{sessionid}/cockpit/@localhost/system/index.html'
         response = self.request(url)
         self.assertEqual(response.status, 200)
         content = response.read()
@@ -111,7 +113,7 @@ class IntegrationTest(unittest.TestCase):
     def test3scaleErrors(self):
         # unauthenticated
         with self.assertRaises(urllib.error.HTTPError) as cm:
-            urllib.request.urlopen('https://localhost:8443/api/webconsole/v1/sessions/new',
+            urllib.request.urlopen(f'https://localhost:8443/{config.ROUTE_CONTROL}/sessions/new',
                                    context=self.ssl_3scale)
         self.assertEqual(cm.exception.code, 401)
         self.assertEqual(cm.exception.reason, 'Unauthorized')
