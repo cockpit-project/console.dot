@@ -88,7 +88,7 @@ def write_routes(sessions):
     for sessionid in sessions:
         routes += f"""
 location {config.ROUTE_BROWSER}/sessions/{sessionid} {{
-    proxy_pass http://session-{sessionid}:9090{config.ROUTE_BROWSER}/sessions/{sessionid};
+    proxy_pass http://session-{sessionid}:9090;
 
     # Required to proxy the connection to Cockpit
     proxy_set_header Host $host;
@@ -105,7 +105,7 @@ location {config.ROUTE_BROWSER}/sessions/{sessionid} {{
     gzip off;
 }}
 location {config.ROUTE_HOST}/sessions/{sessionid} {{
-    proxy_pass http://session-{sessionid}:8080{config.ROUTE_HOST}/sessions/{sessionid};
+    proxy_pass http://session-{sessionid}:8080;
 
     # Required to proxy the connection to Cockpit
     proxy_set_header Host $host;
