@@ -65,7 +65,7 @@ PODMAN_SOCKET = '/run/podman/podman.sock'
 NGINX_PROC = None
 # Pods
 SESSIONS = {}
-REDIS = redis.Redis(host=os.environ["REDIS_HOSTNAME"])
+REDIS = redis.Redis(host=os.environ["REDIS_SERVICE_HOST"], port=int(os.environ.get("REDIS_SERVICE_PORT", "6379")))
 
 
 def get_sessions():
