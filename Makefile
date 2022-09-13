@@ -21,7 +21,7 @@ run: 3scale/certs/service-chain.pem
 	[ $$(id -u) -ne 0 ] || XDG_RUNTIME_DIR=/run; \
 	sed -e "s%{XDG_RUNTIME_DIR}%$${XDG_RUNTIME_DIR}%" \
 	    -e "s%{PORT_3SCALE}%$(PORT_3SCALE)%" \
-	    webconsoledot-local.yaml | podman play kube --network $(NETWORK) -
+	    webconsoleapp-local.yaml | podman play kube --network $(NETWORK) -
 
 # --time only supported in podman >= 4
 clean:
