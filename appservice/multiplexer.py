@@ -178,6 +178,7 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write("creating session container failed: ".encode())
             self.wfile.write(content)
+            return
 
         sessions = get_sessions()
         sessions[sessionid] = True
