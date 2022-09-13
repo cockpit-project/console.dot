@@ -44,7 +44,8 @@ http {{
     keepalive_timeout  65;
 
     server {{
-        listen   80;
+        listen   8080 default_server;
+        listen   [::]:8080 default_server;
 
         server_name localhost;
 
@@ -219,7 +220,7 @@ def start_nginx():
     proc = subprocess.Popen(['nginx'])
 
     # wait for nginx to start up
-    connection = http.client.HTTPConnection('localhost')
+    connection = http.client.HTTPConnection('localhost:8080')
     for _ in range(10):
         try:
             connection.connect()

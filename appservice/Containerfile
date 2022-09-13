@@ -5,6 +5,9 @@ RUN apt-get update && \
     apt-get clean && \
     rm /var/lib/apt/lists/*dists*
 
+# allow unprivileged container user to run nginx and change configuration
+RUN chmod -R a+rw /etc/nginx/ /var/lib/nginx/ /var/log/nginx/ /run
+
 COPY *.py /usr/local/bin/
 
 CMD python3 /usr/local/bin/multiplexer.py
