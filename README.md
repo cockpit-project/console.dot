@@ -68,3 +68,72 @@ This requires `podman` and `sscg` to be available on the host.
    ```
    make check
    ```
+
+## Running on Kubernetes
+
+The app service can also be deployed on Kubernetes, in particular the
+[cockpit-dev project on the staging instance](https://console-openshift-console.apps.c-rh-c-eph.8p0c.p1.openshiftapps.com/k8s/ns/cockpit-dev/pods). This requires you to be inside the Red Hat VPN. Make sure you select the right project with
+
+    oc project cockpit-dev
+
+There is the [app service image BuildConfig](./webconsoleapp-k8s-buildconfig.yaml) and the [pods and services](./webconsoleapp-k8s.yaml).
+Both get deployed with
+
+    make k8s-deploy
+
+
+1. Validate that you can reach the deployment with:
+
+    curl -u user:password https://test.cloud.redhat.com/api/webconsole/v1/ping
+
+   You should get a "pong" response.
+
+2. Prepare a VM to act as the target machine like above for local podman deployment.
+
+3. The hardest part: Due to a [misconfiguration of 3scale](https://issues.redhat.com/browse/COCKPIT-795?focusedCommentId=20703283&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-20703283), browsers don't ask for basic auth. So you need to set up a local proxy that provides the `Authorization:` header for 3scale:
+
+   - Download Linux binaries from https://mitmproxy.org/, unpack them
+   - Create `add-header.py`:
+   ```python
+   class AddHeader:
+       def __init__(self):
+           self.num = 0
+
+       def request(self, flow):
+           flow.request.headers["authorization"] = "Basic bW1hcnVzYWstZXQ6MTIzNDU2Nzg5"
+
+   addons = [AddHeader()]
+   ```
+
+   - Run `./mitmdump -k -s add-header.py --no-http2`
+   - Run `firefox -P`, create a new "mitm-consoledot" profile
+   - Configure the network proxy to be `localhost:8080`, also use it for https.
+   - Go to "View certificates", "Authorities", "Import", and import ~/.mitmproxy/mitmproxy-ca-cert.pem , so that the local proxy's https certificate is trusted
+
+4. Request a new session from the API:
+
+       curl -u user:password https://test.cloud.redhat.com/api/webconsole/v1/sessions/new
+
+   This will respond with a Session ID, like this:
+
+       {"id": "8fee318f-aeeb-413e-ab2f-eeb505f2ec0b"}
+
+   Check the session status:
+
+       curl -u user:password https://test.cloud.redhat.com/api/webconsole/v1/sessions/SESSIONID/status
+
+   It should be "wait_target".
+
+5. Now connect the target VM to the session pod:
+
+      /tmp/cockpit-bridge-websocket-connector.pyz --basic-auth user:password -k wss://test.cloud.redhat.com/wss/webconsole/v1/sessions/SESSIONID/ws
+
+   Check the session status again, it should now be "running".
+
+6. In the mitmproxy Firefox profile, open https://test.cloud.redhat.com/wss/webconsole/v1/sessions/SESSIONID/web/ . You should now get a Cockpit UI for the user you started the bridge as.
+
+You can run
+
+    make k8s-clean
+
+to remove all resources from Kubernetes again.

@@ -22,6 +22,7 @@ import config
 API_URL = os.environ['API_URL']
 SESSION_INSTANCE_DOMAIN = os.getenv('SESSION_INSTANCE_DOMAIN', '')
 PODMAN_SOCKET = '/run/podman/podman.sock'
+K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
 
 # states: wait_target or running
 SESSIONS = {}
@@ -65,16 +66,68 @@ async def new_session_podman(sessionid):
     return status, content
 
 
+async def new_session_k8s(sessionid):
+    name = f'session-{sessionid}'
+    with open(os.path.join(K8S_SERVICE_ACCOUNT, 'namespace')) as f:
+        namespace = f.read().strip()
+    with open(os.path.join(K8S_SERVICE_ACCOUNT, 'token')) as f:
+        authorization = 'Bearer ' + f.read().strip()
+
+    async with httpx.AsyncClient(verify=os.path.join(K8S_SERVICE_ACCOUNT, 'ca.crt')) as http:
+        response = await http.post(f'https://kubernetes.default.svc/api/v1/namespaces/{namespace}/pods',
+                                   headers={
+                                       'Authorization': authorization,
+                                       'Content-Type': 'application/yaml'
+                                   },
+                                   data=f'''
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {name}
+  labels:
+    app: webconsoleapp-session
+spec:
+  hostname: {name}
+  # subdomain must match Service name in webconsoleapp-k8s.yaml
+  subdomain: webconsoleapp-sessions
+  restartPolicy: Never
+  containers:
+  - name: ws
+    # FIXME: make this dynamic
+    image: image-registry.openshift-image-registry.svc:5000/cockpit-dev/webconsoleapp
+    # command: ["sleep", "infinity"]
+    command: ['/cockpit-ws-session.sh']
+    ports:
+      - name: ws
+        containerPort: 8080
+      - name: web
+        containerPort: 9090
+    env:
+      - name: API_URL
+        value: {API_URL}
+      - name: ROUTE_WSS
+        value: {config.ROUTE_WSS}
+      - name: SESSION_ID
+        value: {sessionid}
+'''.encode())
+        return response.status_code, response.text
+
+
 @app.route(f'{config.ROUTE_API}/sessions/new')
 async def handle_session_new(request):
     sessionid = str(uuid.uuid4())
     assert sessionid not in SESSIONS
 
-    if os.path.exists(PODMAN_SOCKET):
+    if os.path.exists(K8S_SERVICE_ACCOUNT):
+        logger.debug('new_session: creating %s with k8s', sessionid)
+        pod_status, content = await new_session_k8s(sessionid)
+    elif os.path.exists(PODMAN_SOCKET):
+        logger.debug('new_session: creating %s with podman', sessionid)
         pod_status, content = await new_session_podman(sessionid)
     else:
-        # TODO: support k8s API
-        raise NotImplementedError('cannot create sessions other than podman')
+        raise NotImplementedError('cannot create sessions without kubernetes or podman')
+
+    logger.debug('new_session result status %i, content: %s', pod_status, content)
 
     if pod_status >= 200 and pod_status < 300:
         response = JSONResponse({'id': sessionid})

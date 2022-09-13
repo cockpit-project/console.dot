@@ -1,0 +1,27 @@
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: webconsoleapp
+
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: build-webconsoleapp
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/jelly/console.dot
+      # FIXME: drop after landing https://github.com/jelly/console.dot/pull/38
+      ref: k8s
+    contextDir: appservice
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: webconsoleapp:latest
