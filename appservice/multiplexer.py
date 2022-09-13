@@ -87,7 +87,7 @@ def write_routes(sessions):
     routes = ""
     for sessionid in sessions:
         routes += f"""
-location {config.ROUTE_BROWSER}/sessions/{sessionid} {{
+location {config.ROUTE_WSS}/sessions/{sessionid}/web {{
     proxy_pass http://session-{sessionid}:9090;
 
     # Required to proxy the connection to Cockpit
@@ -104,7 +104,7 @@ location {config.ROUTE_BROWSER}/sessions/{sessionid} {{
     # See: https://github.com/cockpit-project/cockpit/issues/5239
     gzip off;
 }}
-location {config.ROUTE_HOST}/sessions/{sessionid} {{
+location {config.ROUTE_WSS}/sessions/{sessionid}/ws {{
     proxy_pass http://session-{sessionid}:8080;
 
     # Required to proxy the connection to Cockpit
@@ -123,7 +123,7 @@ location {config.ROUTE_HOST}/sessions/{sessionid} {{
 }}"""
 
     with open('/etc/nginx/nginx.conf', 'w') as f:
-        f.write(NGINX_TEMPLATE.format(routes=routes, route_control=config.ROUTE_CONTROL))
+        f.write(NGINX_TEMPLATE.format(routes=routes, route_control=config.ROUTE_API))
 
 
 class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -139,7 +139,7 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
                 # 'command': ['sleep', 'infinity'],
                 # XXX: http://localhost:8080 origin is for directly connecting to appservice, without 3scale
                 'command': ['sh', '-exc',
-                            f"printf '[Webservice]\nUrlRoot={config.ROUTE_BROWSER}/sessions/{sessionid}/\\n"
+                            f"printf '[Webservice]\nUrlRoot={config.ROUTE_WSS}/sessions/{sessionid}/web\\n"
                             f"Origins = https://localhost:{PORT_3SCALE} http://localhost:8080\\n'"
                             "> /etc/cockpit/cockpit.conf;"
                             "exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
@@ -193,9 +193,9 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         logger.debug("GET %s", self.path)
-        if self.path == f"{config.ROUTE_CONTROL}/sessions/new":
+        if self.path == f"{config.ROUTE_API}/sessions/new":
             self.new_session()
-        if self.path == f"{config.ROUTE_CONTROL}/ping":
+        if self.path == f"{config.ROUTE_API}/ping":
             self.ping()
         else:
             self.send_response(404, 'Not found')

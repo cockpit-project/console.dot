@@ -52,12 +52,12 @@ This requires `podman` and `sscg` to be available on the host.
    `SESSION_ID` with the UUID that the `/new` call returned.
    Run this command as the user for which you want to get a Cockpit session:
    ```
-   /tmp/websocat --basic-auth admin:foobar -b -k wss://_gateway:8443/wss/webconsole-ws/v1/sessions/SESSION_ID cmd:cockpit-bridge
+   /tmp/websocat --basic-auth admin:foobar -b -k wss://_gateway:8443/wss/webconsole/v1/sessions/SESSION_ID/ws cmd:cockpit-bridge
    ```
 
  - Open Cockpit in a browser:
 
-   https://localhost:8443/wss/webconsole-http/v1/sessions/SESSION_ID/
+   https://localhost:8443/wss/webconsole/v1/sessions/SESSION_ID/web/
 
  - Clean up:
    ```

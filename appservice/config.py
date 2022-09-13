@@ -1,6 +1,3 @@
-# 3scale route configuration: session control API (new, status)
-ROUTE_CONTROL = '/api/webconsole/v1'
-# per-session endpoint for browser
-ROUTE_BROWSER = '/wss/webconsole-http/v1'
-# per-session endpoint for managed host
-ROUTE_HOST = '/wss/webconsole-ws/v1'
+# 3scale application route configuration
+ROUTE_API = '/api/webconsole/v1'
+ROUTE_WSS = '/wss/webconsole/v1'
