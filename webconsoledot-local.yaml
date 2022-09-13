@@ -23,7 +23,8 @@ spec:
           name: appservice-mod
           readOnly: true
       env:
-        - name: REDIS_HOSTNAME
+        # k8s compatible
+        - name: REDIS_SERVICE_HOST
           # HACK: podman < 4 cannot DNS-resolve container names in pod, so use pod name
           # value: "webconsoleapp-redis"
           value: "webconsoleapp"
