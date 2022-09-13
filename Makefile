@@ -45,4 +45,14 @@ clean:
 check: server/cockpit-bridge-websocket-connector.pyz
 	python3 -m unittest discover -vs test
 
-.PHONY: containers run clean build
+k8s-clean:
+	oc delete -f webconsoleapp-k8s.yaml --ignore-not-found=true
+	oc get pods --selector app=webconsoleapp-session -o name | xargs -rn1 oc delete --force=true
+	oc delete -f webconsoleapp-k8s-buildconfig.yaml --ignore-not-found=true
+
+k8s-deploy: k8s-clean
+	oc create -f webconsoleapp-k8s-buildconfig.yaml
+	oc start-build build-webconsoleapp --follow
+	oc create -f webconsoleapp-k8s.yaml
+
+.PHONY: containers run clean build k8s-clean k8s-deploy
