@@ -19,6 +19,7 @@ import config
 logger = logging.getLogger("multiplexer")
 
 API_URL = os.environ['API_URL']
+SESSION_INSTANCE_DOMAIN = os.getenv('SESSION_INSTANCE_DOMAIN', '')
 
 NGINX_TEMPLATE = """
 daemon off;
@@ -88,7 +89,7 @@ def write_routes(sessions):
     for sessionid in sessions:
         routes += f"""
 location {config.ROUTE_WSS}/sessions/{sessionid}/web {{
-    proxy_pass http://session-{sessionid}:9090;
+    proxy_pass http://session-{sessionid}{SESSION_INSTANCE_DOMAIN}:9090;
 
     # Required to proxy the connection to Cockpit
     proxy_set_header Host $host;
@@ -105,7 +106,7 @@ location {config.ROUTE_WSS}/sessions/{sessionid}/web {{
     gzip off;
 }}
 location {config.ROUTE_WSS}/sessions/{sessionid}/ws {{
-    proxy_pass http://session-{sessionid}:8080;
+    proxy_pass http://session-{sessionid}{SESSION_INSTANCE_DOMAIN}:8080;
 
     # Required to proxy the connection to Cockpit
     proxy_set_header Host $host;
