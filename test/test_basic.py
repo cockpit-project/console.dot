@@ -31,6 +31,7 @@ class IntegrationTest(unittest.TestCase):
             raise
 
     def dumpLogs(self):
+        color = os.isatty(1)
         ids = set(subprocess.check_output(
             ['podman', 'ps', '--all', '--quiet', '--filter', 'pod=webconsoleapp'],
             universal_newlines=True).split())
@@ -38,8 +39,12 @@ class IntegrationTest(unittest.TestCase):
             ['podman', 'ps', '--all', '--quiet', '--filter', 'network=consoledot'],
             universal_newlines=True).split())
         for id in ids:
-            print('======')
+            if color:
+                print('\033[31;1m', end='', flush=True)
+            print('\n======')
             subprocess.call(['podman', 'ps', '--noheading', '--all', '--filter', f'id={id}'])
+            if color:
+                print('\033[0m', end='', flush=True)
             subprocess.call(['podman', 'logs', id])
         if os.getenv('TEST_SIT'):
             input("TEST FAILURE --investigate and press Enter to clean up")
