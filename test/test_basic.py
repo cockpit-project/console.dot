@@ -19,7 +19,7 @@ class IntegrationTest(unittest.TestCase):
 
     def setUp(self):
         try:
-            subprocess.check_call(["make", "run"], cwd=projroot)
+            subprocess.check_call(['make', 'run'], cwd=projroot)
             self.ssl_3scale = ssl.create_default_context(cafile=os.path.join(projroot, '3scale', 'certs', 'ca.crt'))
 
             # read API_URL as specified in deployment YAML
@@ -48,7 +48,7 @@ class IntegrationTest(unittest.TestCase):
                 print('\033[0m', end='', flush=True)
             subprocess.call(['podman', 'logs', id])
         if os.getenv('TEST_SIT'):
-            input("TEST FAILURE --investigate and press Enter to clean up")
+            input('TEST FAILURE -- investigate and press Enter to clean up')
 
     def tearDown(self):
         if hasattr(self._outcome, 'errors'):
@@ -63,7 +63,7 @@ class IntegrationTest(unittest.TestCase):
         if not ok:
             self.dumpLogs()
 
-        subprocess.check_call(["make", "clean"], cwd=projroot)
+        subprocess.check_call(['make', 'clean'], cwd=projroot)
 
     def request(self, url, retries=0):
         b64 = base64.b64encode(b'admin:foobar').decode()
@@ -88,7 +88,7 @@ class IntegrationTest(unittest.TestCase):
             time.sleep(1)
             tries += 1
 
-        self.fail(f"timeout reached trying to request {url}")
+        self.fail(f'timeout reached trying to request {url}')
 
     def testBasic(self):
         response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new')
