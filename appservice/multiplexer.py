@@ -139,14 +139,17 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
                 # 'command': ['sleep', 'infinity'],
                 # XXX: http://localhost:8080 origin is for directly connecting to appservice, without 3scale
                 'command': ['sh', '-exc',
+                            f"mkdir -p /tmp/conf/cockpit; "
                             f"printf '[Webservice]\nUrlRoot={config.ROUTE_WSS}/sessions/{sessionid}/web\\n"
                             f"Origins = https://localhost:{PORT_3SCALE} http://localhost:8080\\n'"
-                            "> /etc/cockpit/cockpit.conf;"
+                            "> /tmp/conf/cockpit/cockpit.conf;"
+                            "export XDG_CONFIG_DIRS=/tmp/conf;"
                             "exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
                 'remove': True,
                 'netns': {'nsmode': 'bridge'},
                 # deprecated; use this with podman ≥ 4: 'Networks': {'consoledot': {}},
                 'cni_networks': ['consoledot'],
+                'user': 'cockpit-wsinstance',
         }
         connection.request('POST', '/v1.12/libpod/containers/create', body=json.dumps(body))
         response = connection.getresponse()
