@@ -90,7 +90,7 @@ class IntegrationTest(unittest.TestCase):
 
         self.fail(f'timeout reached trying to request {url}')
 
-    def testBasic(self):
+    def newSession(self):
         response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new')
         self.assertEqual(response.status, 200)
         sessionid = json.load(response)['id']
@@ -103,8 +103,12 @@ class IntegrationTest(unittest.TestCase):
         cmd = ['websocat', '--basic-auth', 'admin:foobar', '-b', '-k',
                f'{websocket_url}{config.ROUTE_WSS}/sessions/{sessionid}/ws',
                'cmd:cockpit-bridge']
+
         subprocess.check_call(podman + cmd)
 
+        return sessionid
+
+    def checkSession(self, sessionid):
         # Shell
         url = f'{self.api_url}{config.ROUTE_WSS}/sessions/{sessionid}/web/'
         response = self.request(url)
@@ -120,6 +124,16 @@ class IntegrationTest(unittest.TestCase):
         content = response.read()
         self.assertIn(b'base1/cockpit.js', content)
         self.assertIn(b'Overview', content)
+
+    def testSessions(self):
+        s1 = self.newSession()
+        self.checkSession(s1)
+
+        # can create more than one session
+        s2 = self.newSession()
+        self.checkSession(s2)
+        # first session still works
+        self.checkSession(s1)
 
     def test3scaleErrors(self):
         # unauthenticated
