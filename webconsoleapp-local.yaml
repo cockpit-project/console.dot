@@ -12,7 +12,7 @@ spec:
   restartPolicy: Never
   containers:
     - name: front-end
-      image: localhost/webconsoleapp:latest
+      image: localhost/webconsoleapp
       ports:
         - containerPort: 8080
           hostPort: 8080
@@ -34,7 +34,7 @@ spec:
           value: .dns.podman
 
     - name: redis
-      image: docker.io/redis:latest
+      image: docker.io/redis
 
     - name: 3scale
       image: docker.io/library/nginx
