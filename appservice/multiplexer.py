@@ -199,7 +199,7 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         logger.debug("GET %s", self.path)
         if self.path == f"{config.ROUTE_API}/sessions/new":
             self.new_session()
-        if self.path == f"{config.ROUTE_API}/ping":
+        elif self.path == f"{config.ROUTE_API}/ping":
             self.ping()
         else:
             self.send_response(404, 'Not found')
