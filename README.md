@@ -68,3 +68,17 @@ This requires `podman` and `sscg` to be available on the host.
    ```
    make check
    ```
+
+## Diagrams
+
+Setup overview
+```mermaid
+graph TD
+    A[Browser] -->|POST /api/webconsole/v1/sessions/new| B(3scale)
+    B --> C[Multiplexer]
+    C --> B
+    C --> D[Session pod]
+    D --> C
+    C -->|create new pod| E[Podman socket/oc]
+    F[RHEL Server] -->|/wss/webconsole/v1/sessions/SESSION_ID/ws| B
+```
