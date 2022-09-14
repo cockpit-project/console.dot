@@ -14,18 +14,19 @@ from appservice import config
 
 projroot = os.path.dirname(os.path.dirname(__file__))
 
-PORT_3SCALE = os.getenv('PORT_3SCALE')
-URL_3SCALE = f'https://localhost:{PORT_3SCALE}'
-
 
 class IntegrationTest(unittest.TestCase):
 
     def setUp(self):
         try:
             subprocess.check_call(["make", "run"], cwd=projroot)
-            # Wait until the appservice container is up
             self.ssl_3scale = ssl.create_default_context(cafile=os.path.join(projroot, '3scale', 'certs', 'ca.crt'))
-            self.request(f'{URL_3SCALE}{config.ROUTE_API}/ping', retries=5)
+
+            # read API_URL as specified in deployment YAML
+            self.api_url = subprocess.check_output(['podman', 'exec', 'webconsoleapp-front-end',
+                                                    'sh', '-euc', 'echo $API_URL']).decode().strip()
+            # Wait until the appservice container is up
+            self.request(f'{self.api_url}{config.ROUTE_API}/ping', retries=5)
         except (subprocess.CalledProcessError, AssertionError, IOError, OSError):
             self.dumpLogs()
             raise
@@ -90,20 +91,22 @@ class IntegrationTest(unittest.TestCase):
         self.fail(f"timeout reached trying to request {url}")
 
     def testBasic(self):
-        response = self.request(f'{URL_3SCALE}{config.ROUTE_API}/sessions/new')
+        response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new')
         self.assertEqual(response.status, 200)
         sessionid = json.load(response)['id']
         self.assertIsInstance(sessionid, str)
 
+        # API URL is on the container host's localhost; translate for the container DNS
+        websocket_url = self.api_url.replace('localhost', 'host.containers.internal').replace('https:', 'wss:')
         podman = ['podman', 'run', '-d', '--pod', 'webconsoleapp',
                   '--network', 'consoledot', 'localhost/webconsoleserver']
         cmd = ['websocat', '--basic-auth', 'admin:foobar', '-b', '-k',
-               f'wss://host.containers.internal:{PORT_3SCALE}{config.ROUTE_WSS}/sessions/{sessionid}/ws',
+               f'{websocket_url}{config.ROUTE_WSS}/sessions/{sessionid}/ws',
                'cmd:cockpit-bridge']
         subprocess.check_call(podman + cmd)
 
         # Shell
-        url = f'{URL_3SCALE}{config.ROUTE_WSS}/sessions/{sessionid}/web/'
+        url = f'{self.api_url}{config.ROUTE_WSS}/sessions/{sessionid}/web/'
         response = self.request(url)
         self.assertEqual(response.status, 200)
         content = response.read()
@@ -111,7 +114,7 @@ class IntegrationTest(unittest.TestCase):
         self.assertIn(b'id="topnav"', content)
 
         # Overview frame
-        url = f'{URL_3SCALE}{config.ROUTE_WSS}/sessions/{sessionid}/web/cockpit/@localhost/system/index.html'
+        url = f'{self.api_url}{config.ROUTE_WSS}/sessions/{sessionid}/web/cockpit/@localhost/system/index.html'
         response = self.request(url)
         self.assertEqual(response.status, 200)
         content = response.read()
@@ -121,12 +124,12 @@ class IntegrationTest(unittest.TestCase):
     def test3scaleErrors(self):
         # unauthenticated
         with self.assertRaises(urllib.error.HTTPError) as cm:
-            urllib.request.urlopen(f'{URL_3SCALE}{config.ROUTE_API}/sessions/new',
+            urllib.request.urlopen(f'{self.api_url}{config.ROUTE_API}/sessions/new',
                                    context=self.ssl_3scale)
         self.assertEqual(cm.exception.code, 401)
         self.assertEqual(cm.exception.reason, 'Unauthorized')
 
         # unknown path
         with self.assertRaises(urllib.error.HTTPError) as cm:
-            self.request(f'{URL_3SCALE}/bogus/blah')
+            self.request(f'{self.api_url}/bogus/blah')
         self.assertEqual(cm.exception.code, 418)

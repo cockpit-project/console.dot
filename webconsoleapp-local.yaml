@@ -28,8 +28,8 @@ spec:
           # HACK: podman < 4 cannot DNS-resolve container names in pod, so use pod name
           # value: "webconsoleapp-redis"
           value: "webconsoleapp"
-        - name: PORT_3SCALE
-          value: {PORT_3SCALE}
+        - name: API_URL
+          value: https://localhost:{PORT_3SCALE}
 
     - name: redis
       image: docker.io/redis:latest
