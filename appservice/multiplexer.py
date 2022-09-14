@@ -52,8 +52,11 @@ http {{
 
         {routes}
 
-        location {route_control} {{
-            proxy_pass http://localhost:8081;
+        location {route_control}/ping {{
+            proxy_pass http://127.0.0.1:8081;
+        }}
+        location {route_control}/sessions/new {{
+            proxy_pass http://127.0.0.1:8081;
         }}
 
         location / {{
