@@ -18,7 +18,7 @@ import config
 
 logger = logging.getLogger("multiplexer")
 
-PORT_3SCALE = os.getenv('PORT_3SCALE')
+API_URL = os.environ['API_URL']
 
 NGINX_TEMPLATE = """
 daemon off;
@@ -141,7 +141,7 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
                 'command': ['sh', '-exc',
                             f"mkdir -p /tmp/conf/cockpit; "
                             f"printf '[Webservice]\nUrlRoot={config.ROUTE_WSS}/sessions/{sessionid}/web\\n"
-                            f"Origins = https://localhost:{PORT_3SCALE} http://localhost:8080\\n'"
+                            f"Origins = {API_URL} http://localhost:8080\\n'"
                             "> /tmp/conf/cockpit/cockpit.conf;"
                             "export XDG_CONFIG_DIRS=/tmp/conf;"
                             "exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],

@@ -32,7 +32,7 @@ clean:
 	fi
 
 check:
-	env PORT_3SCALE=$(PORT_3SCALE) python3 -m unittest discover -vs test
+	python3 -m unittest discover -vs test
 
 all: containers
 
