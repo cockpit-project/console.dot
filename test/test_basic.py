@@ -65,30 +65,36 @@ class IntegrationTest(unittest.TestCase):
 
         subprocess.check_call(['make', 'clean'], cwd=projroot)
 
-    def request(self, url, retries=0):
+    @staticmethod
+    def get_auth_request(url):
         b64 = base64.b64encode(b'admin:foobar').decode()
 
         request = urllib.request.Request(url)
         request.add_header('Authorization', f'Basic {b64}')
-        tries = 0
+        return request
 
+    def request(self, url, retries=0):
+        request = self.get_auth_request(url)
+        tries = 0
+        last_exc = None
         while tries <= retries:
             try:
                 response = urllib.request.urlopen(request, context=self.ssl_3scale, timeout=1)
                 if response.status >= 200 and response.status < 300:
                     return response
             except urllib.error.HTTPError as exc:
+                last_exc = exc
                 if 'Bad Gateway' in str(exc):
                     pass
                 else:
                     raise
-            except TimeoutError:
-                pass
+            except TimeoutError as exc:
+                last_exc = exc
 
             time.sleep(1)
             tries += 1
 
-        self.fail(f'timeout reached trying to request {url}')
+        self.fail(f'timeout reached trying to request {url}: {last_exc}')
 
     def newSession(self):
         response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new')
