@@ -1,9 +1,8 @@
-FROM debian:bookworm
+FROM docker.io/redhat/ubi9-minimal
 
-RUN apt-get update && \
-    apt-get install -y python3 python3-redis python3-aiohttp curl inetutils-ping procps && \
-    apt-get clean && \
-    rm /var/lib/apt/lists/*dists*
+# iputils and procps-ng are just for debugging; drop for production
+RUN microdnf install -y python3-pip iputils procps-ng && microdnf clean all
+RUN pip3 install aiohttp redis
 
 COPY *.py /usr/local/bin/
 
