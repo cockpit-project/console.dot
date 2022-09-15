@@ -147,7 +147,6 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
                             "> /tmp/conf/cockpit/cockpit.conf;"
                             "export XDG_CONFIG_DIRS=/tmp/conf;"
                             "exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
-                'remove': True,
                 'netns': {'nsmode': 'bridge'},
                 # deprecated; use this with podman ≥ 4: 'Networks': {'consoledot': {}},
                 'cni_networks': ['consoledot'],
