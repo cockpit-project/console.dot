@@ -1,12 +1,9 @@
 FROM debian:bookworm
 
 RUN apt-get update && \
-    apt-get install -y python3 python3-redis nginx curl inetutils-ping procps && \
+    apt-get install -y python3 python3-redis python3-aiohttp curl inetutils-ping procps && \
     apt-get clean && \
     rm /var/lib/apt/lists/*dists*
-
-# allow unprivileged container user to run nginx and change configuration
-RUN chmod -R a+rw /etc/nginx/ /var/lib/nginx/ /var/log/nginx/ /run
 
 COPY *.py /usr/local/bin/
 
