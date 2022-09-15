@@ -99,6 +99,7 @@ class IntegrationTest(unittest.TestCase):
     def newSession(self):
         response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new')
         self.assertEqual(response.status, 200)
+        self.assertEqual(response.getheader('Content-Type'), 'application/json; charset=utf-8')
         sessionid = json.load(response)['id']
         self.assertIsInstance(sessionid, str)
 
@@ -142,6 +143,21 @@ class IntegrationTest(unittest.TestCase):
         # can create more than one session
         s2 = self.newSession()
         self.checkSession(s2)
+        # first session still works
+        self.checkSession(s1)
+
+        # crash container for s2; use --time 0 once we have podman 4.0 everywhere
+        subprocess.check_call(['podman', 'rm', '--force', f'session-{s2}'])
+        # first session still works
+        self.checkSession(s1)
+        # second session is broken
+        request = self.get_auth_request(f'{self.api_url}{config.ROUTE_WSS}/sessions/{s2}/web/')
+        with self.assertRaises(OSError):
+            urllib.request.urlopen(request, context=self.ssl_3scale, timeout=1)
+
+        # can create a new session
+        s3 = self.newSession()
+        self.checkSession(s3)
         # first session still works
         self.checkSession(s1)
 
