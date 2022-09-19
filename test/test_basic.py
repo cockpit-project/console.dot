@@ -103,6 +103,11 @@ class IntegrationTest(unittest.TestCase):
         sessionid = json.load(response)['id']
         self.assertIsInstance(sessionid, str)
 
+        # inital status
+        response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/{sessionid}/status')
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.read(), b'wait_target')
+
         # API URL is on the container host's localhost; translate for the container DNS
         websocket_url = self.api_url.replace('localhost', 'host.containers.internal').replace('https:', 'wss:')
         podman = ['podman', 'run', '-d', '--pod', 'webconsoleapp',
@@ -116,6 +121,17 @@ class IntegrationTest(unittest.TestCase):
                f' {websocket_url}{config.ROUTE_WSS}/sessions/{sessionid}/ws']
 
         subprocess.check_call(podman + cmd)
+
+        # successful bridge connection updates status
+        for retry in range(10):
+            response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/{sessionid}/status')
+            self.assertEqual(response.status, 200)
+            status = response.read()
+            if status == b'running':
+                break
+            time.sleep(0.5)
+        else:
+            self.fail(f'session status was not updated to running, still at {status}')
 
         return sessionid
 
@@ -145,6 +161,11 @@ class IntegrationTest(unittest.TestCase):
         self.checkSession(s2)
         # first session still works
         self.checkSession(s1)
+
+        # unknown session ID
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self.request(f'{self.api_url}{config.ROUTE_API}/sessions/123unknown/status')
+        self.assertEqual(cm.exception.code, 404)
 
         # crash container for s2; use --time 0 once we have podman 4.0 everywhere
         subprocess.check_call(['podman', 'rm', '--force', f'session-{s2}'])

@@ -17,6 +17,7 @@ API_URL = os.environ['API_URL']
 SESSION_INSTANCE_DOMAIN = os.getenv('SESSION_INSTANCE_DOMAIN', '')
 
 PODMAN_SOCKET = '/run/podman/podman.sock'
+# states: wait_target or running
 SESSIONS = {}
 REDIS = redis.Redis(host=os.environ['REDIS_SERVICE_HOST'], port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
 
@@ -84,7 +85,6 @@ class Handlers:
         return status, content
 
     async def handle_session_new(self, request):
-        global SESSIONS
         sessionid = str(uuid.uuid4())
         assert sessionid not in SESSIONS
 
@@ -96,14 +96,18 @@ class Handlers:
 
         if pod_status >= 200 and pod_status < 300:
             response = web.json_response({'id': sessionid})
-            SESSIONS[sessionid] = True
-            dumped_sessions = json.dumps(SESSIONS)
-            await REDIS.set('sessions', dumped_sessions)
-            await REDIS.publish('sessions', dumped_sessions)
+            await update_session(sessionid, 'wait_target')
         else:
             response = web.Response(status=pod_status, text=f'creating session container failed: {content}')
 
         return response
+
+    async def handle_session_status(self, request):
+        sessionid = request.match_info['sessionid']
+        try:
+            return web.Response(text=SESSIONS[sessionid])
+        except KeyError:
+            return web.HTTPNotFound(text='unknown session ID')
 
     async def handle_session_id(self, upstream_req):
         sessionid = upstream_req.match_info['sessionid']
@@ -115,6 +119,8 @@ class Handlers:
             target_url = f'http://session-{sessionid}{SESSION_INSTANCE_DOMAIN}:9090{upstream_req.path_qs}'
         elif path == 'ws':
             target_url = f'http://session-{sessionid}{SESSION_INSTANCE_DOMAIN}:8080{upstream_req.path_qs}'
+            if SESSIONS[sessionid] == 'wait_target':
+                await update_session(sessionid, 'running')
         else:
             return web.HTTPNotFound(text=f'invalid session path prefix: {path}')
 
@@ -188,6 +194,14 @@ async def init_sessions():
     logger.debug('initial sessions: %s', SESSIONS)
 
 
+async def update_session(session_id, status):
+    global SESSIONS
+    SESSIONS[session_id] = status
+    dumped_sessions = json.dumps(SESSIONS)
+    await REDIS.set('sessions', dumped_sessions)
+    await REDIS.publish('sessions', dumped_sessions)
+
+
 async def watch_redis(channel):
     global SESSIONS
     while True:
@@ -217,6 +231,7 @@ async def main():
         app = web.Application()
         app.router.add_route('GET', f'{config.ROUTE_API}/ping', handlers.handle_ping)
         app.router.add_route('GET', f'{config.ROUTE_API}/sessions/new', handlers.handle_session_new)
+        app.router.add_route('GET', f'{config.ROUTE_API}/sessions/{{sessionid}}/status', handlers.handle_session_status)
         app.router.add_route('*', f'{config.ROUTE_WSS}/sessions/{{sessionid}}/{{path:.*}}', handlers.handle_session_id)
 
         runner = web.AppRunner(app, auto_decompress=False)
