@@ -99,7 +99,7 @@ class IntegrationTest(unittest.TestCase):
     def newSession(self):
         response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new')
         self.assertEqual(response.status, 200)
-        self.assertEqual(response.getheader('Content-Type'), 'application/json; charset=utf-8')
+        self.assertEqual(response.getheader('Content-Type'), 'application/json')
         sessionid = json.load(response)['id']
         self.assertIsInstance(sessionid, str)
 

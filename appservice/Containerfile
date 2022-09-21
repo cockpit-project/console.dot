@@ -2,7 +2,7 @@ FROM docker.io/redhat/ubi9-minimal
 
 # iputils and procps-ng are just for debugging; drop for production
 RUN microdnf install -y python3-pip iputils procps-ng && microdnf clean all
-RUN pip3 install aiohttp redis
+RUN pip3 install redis starlette httpx websockets uvicorn
 
 COPY *.py /usr/local/bin/
 
