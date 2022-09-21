@@ -240,6 +240,38 @@ async def update_session(session_id, status):
     await REDIS.publish('sessions', dumped_sessions)
 
 
+# Terrifying hack around broken 3scale Connection: header; see https://issues.redhat.com/browse/RHCLOUD-21326
+# uvicorn's H11Protocol.handle_events() can't be tapped into, so we need to monkey-patch
+# h11.Connection.next_event() to deliver non-broken headers; otherwise uvicorn refuses these paths with
+# "Unsupported upgrade request".
+import h11  # noqa: E402
+h11.Connection.next_event_real = h11.Connection.next_event
+
+
+def hack_h11_con_next_event(self):
+    res = h11.Connection.next_event_real(self)
+    if type(res) == h11.Request:
+        connection_idx = None
+        has_upgrade = False
+        for i, (name, value) in enumerate(res.headers):
+            if name == b'connection' and b'Upgrade' in value:
+                connection_idx = i
+            if name == b'upgrade':
+                has_upgrade = True
+
+        if connection_idx is not None and not has_upgrade:
+            res.headers._full_items[connection_idx] = (
+                    res.headers._full_items[connection_idx][0],  # raw name
+                    res.headers._full_items[connection_idx][1],  # normalized name
+                    res.headers._full_items[connection_idx][2].replace(b'Upgrade', b''))  # value
+            logger.debug('hack_h11_con_next_event on %s: fixing broken Connection: header', res.target)
+
+    return res
+
+
+h11.Connection.next_event = hack_h11_con_next_event
+# End hack
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     uvicorn.run(app, host='0.0.0.0', port=8080)
