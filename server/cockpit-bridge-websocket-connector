@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+
+import argparse
+import asyncio
+import asyncio.subprocess
+import base64
+import logging
+import ssl
+
+import websockets
+
+logger = logging.getLogger(__name__)
+
+BRIDGE = 'cockpit-bridge'
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Connect cockpit-bridge to a websocket URL')
+    parser.add_argument('-d', '--debug', action='store_true', help='Enable debug logging')
+    parser.add_argument('--extra-ca-cert', help='Additional CA certificate')
+    parser.add_argument('-k', '--insecure', action='store_true',
+                        help='Accept invalid certificates and hostnames while connecting to TLS')
+    parser.add_argument('--basic-auth', metavar="USER:PASSWORD",
+                        help='Authenticate with user/password (for testing)')
+    parser.add_argument('url', help='Connect to this ws:// or wss:// URL')
+    return parser.parse_args()
+
+
+async def ws2bridge(ws, bridge_input):
+    try:
+        async for message in ws:
+            bridge_input.write(message)
+            logger.debug('ws -> bridge: %s', message)
+            await bridge_input.drain()
+    except websockets.exceptions.ConnectionClosedError as e:
+        logger.debug('ws2bridge: websocket connection got closed: %s', e)
+        return
+
+
+async def bridge2ws(bridge_output, ws):
+    while True:
+        message = await bridge_output.read(4096)
+        if not message:
+            break
+        logger.debug('bridge -> ws: %s', message)
+        await ws.send(message)
+
+
+async def bridge(args):
+    headers = {}
+    ssl_context = ssl.create_default_context()
+
+    if args.basic_auth:
+        headers['Authorization'] = 'Basic ' + base64.b64encode(args.basic_auth.encode()).decode()
+
+    if args.extra_ca_cert:
+        ssl_context.load_verify_locations(args.extra_ca_cert)
+
+    if args.insecure:
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+    async with websockets.connect(args.url, extra_headers=headers, ssl=ssl_context) as websocket:
+        p_bridge = await asyncio.create_subprocess_exec(
+                BRIDGE, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
+        logger.debug('Started %s: pid %i', BRIDGE, p_bridge.pid)
+
+        ws2bridge_task = asyncio.create_task(ws2bridge(websocket, p_bridge.stdin))
+        bridge2ws_task = asyncio.create_task(bridge2ws(p_bridge.stdout, websocket))
+        _done, pending = await asyncio.wait([ws2bridge_task, bridge2ws_task],
+                                            return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+
+
+def main():
+    args = parse_args()
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+    asyncio.run(bridge(args))
+
+
+if __name__ == '__main__':
+    main()

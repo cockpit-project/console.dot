@@ -17,7 +17,7 @@ This requires `podman` and `sscg` to be available on the host.
 
 ## Usage
 
- - Build the credentials and custom container:
+ - Build the credentials, custom container, and connector zipapps:
    ```
    make
    ```
@@ -39,10 +39,10 @@ This requires `podman` and `sscg` to be available on the host.
 
  - Pick some target machine/VM on which you want to get a Cockpit session; this can just be a local VM.
    It needs to have Cockpit ≥ 275 installed, at least the `cockpit-system` and `cockpit-bridge` packages.
-   You also need to install [websocat](https://github.com/vi/websocat) for the time being:
+   You also need to copy `server/cockpit-bridge-websocket-connector.pyz` to the target machine (in the
+   final product this will be transmitted through Ansible):
    ```
-   curl -L -o /tmp/websocat https://github.com/vi/websocat/releases/download/v1.10.0/websocat.x86_64-unknown-linux-musl
-   chmod a+x /tmp/websocat
+   scp server/cockpit-bridge-websocket-connector.pyz target_machine:/tmp/
    ```
 
  - Connect the target machine to the ws session container. In a VM with a
@@ -52,7 +52,7 @@ This requires `podman` and `sscg` to be available on the host.
    `SESSION_ID` with the UUID that the `/new` call returned.
    Run this command as the user for which you want to get a Cockpit session:
    ```
-   /tmp/websocat --basic-auth admin:foobar -b -k wss://_gateway:8443/wss/webconsole/v1/sessions/SESSION_ID/ws cmd:cockpit-bridge
+   /tmp/cockpit-bridge-websocket-connector.pyz --basic-auth admin:foobar -k wss://_gateway:8443/wss/webconsole/v1/sessions/SESSION_ID/ws
    ```
 
  - Open Cockpit in a browser:
