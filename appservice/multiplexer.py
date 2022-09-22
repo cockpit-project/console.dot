@@ -6,7 +6,8 @@ import os
 import uuid
 
 import httpx
-import redis.asyncio as redis
+import redis.exceptions
+import redis.asyncio
 import uvicorn
 import websockets
 
@@ -25,7 +26,8 @@ PODMAN_SOCKET = '/run/podman/podman.sock'
 # states: wait_target or running
 SESSIONS = {}
 
-REDIS = redis.Redis(host=os.environ['REDIS_SERVICE_HOST'], port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
+REDIS = redis.asyncio.Redis(host=os.environ['REDIS_SERVICE_HOST'],
+                            port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
 logger = logging.getLogger('multiplexer')
 app = Starlette()
 
@@ -217,7 +219,17 @@ async def init_sessions():
     global SESSIONS
 
     pubsub = REDIS.pubsub()
-    await pubsub.subscribe('sessions')
+    # wait for Redis service to be up
+    for retry in range(10):
+        try:
+            await pubsub.subscribe('sessions')
+            break
+        except redis.exceptions.ConnectionError as e:
+            logger.warning('Failed to connect to Redis, retry %i: %s', retry, e)
+            await asyncio.sleep(retry * retry + 1)
+    else:
+        raise RuntimeError('timed out trying to connect to Redis')
+
     asyncio.create_task(watch_redis(pubsub))
 
     sessions = await REDIS.get('sessions')
