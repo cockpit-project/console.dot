@@ -1,8 +1,7 @@
+# Test container image that represents a remote managed server which connects
+# to consoledot. This illustrates the minimum dependencies.
 FROM debian:bookworm
 
 RUN apt-get update && \
-    apt-get install -y cockpit-bridge cockpit-system curl procps && \
+    apt-get install -y cockpit-bridge cockpit-system ca-certificates python3 && \
     apt-get clean
-
-RUN curl -L -o /usr/local/bin/websocat https://github.com/vi/websocat/releases/download/v1.10.0/websocat.x86_64-unknown-linux-musl && \
-    chmod a+x /usr/local/bin/websocat

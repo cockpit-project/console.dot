@@ -1,2 +1,4 @@
-3scale/certs
 __pycache__
+*.pyz
+3scale/certs
+tmp/

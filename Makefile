@@ -3,11 +3,23 @@ CONTAINER_NAME = webconsoleapp
 SERVER_CONTAINER_NAME = webconsoleserver
 PORT_3SCALE = 8443
 
-build: 3scale/certs/service-chain.pem containers
+build: 3scale/certs/service-chain.pem server/cockpit-bridge-websocket-connector.pyz containers
 
 3scale/certs/service-chain.pem:
 	mkdir -p 3scale/certs && cd 3scale/certs && sscg --subject-alt-name localhost --subject-alt-name host.containers.internal
 	cat 3scale/certs/service.pem 3scale/certs/ca.crt > $@
+
+# bundle https://pypi.org/project/websockets; it's packaged everywhere, but we
+# don't want to install anything on target machines
+# chmod is a hack around https://github.com/python/cpython/issues/96867
+server/cockpit-bridge-websocket-connector.pyz: server/cockpit-bridge-websocket-connector
+	rm -rf tmp/pyz
+	mkdir -p tmp/pyz
+	cp $< tmp/pyz/cockpit_bridge_websocket_connector.py
+	python3 -m pip install --no-compile --target tmp/pyz/ websockets
+	find tmp/pyz/ -name '*.c' -or -name '*.so' -delete
+	python3 -m zipapp --python="/usr/bin/env python3" --compress --output $@ --main cockpit_bridge_websocket_connector:main tmp/pyz
+	chmod a+x $@
 
 containers:
 	podman build -t $(CONTAINER_NAME) appservice
@@ -31,7 +43,7 @@ clean:
 	    podman network rm --force $(NETWORK); \
 	fi
 
-check:
+check: server/cockpit-bridge-websocket-connector.pyz
 	python3 -m unittest discover -vs test
 
 .PHONY: containers run clean build
