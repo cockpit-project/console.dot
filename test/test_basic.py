@@ -105,10 +105,12 @@ class IntegrationTest(unittest.TestCase):
         # API URL is on the container host's localhost; translate for the container DNS
         websocket_url = self.api_url.replace('localhost', 'host.containers.internal').replace('https:', 'wss:')
         podman = ['podman', 'run', '-d', '--pod', 'webconsoleapp',
+                  '--volume', './3scale/certs/ca.crt:/usr/local/share/ca-certificates/3scale-ca.crt',
                   '--network', 'consoledot', 'localhost/webconsoleserver']
-        cmd = ['websocat', '--basic-auth', 'admin:foobar', '-b', '-k',
-               f'{websocket_url}{config.ROUTE_WSS}/sessions/{sessionid}/ws',
-               'cmd:cockpit-bridge']
+        cmd = ['sh', '-exc',
+               f'update-ca-certificates; '
+               f'websocat --basic-auth admin:foobar -b {websocket_url}{config.ROUTE_WSS}/sessions/{sessionid}/ws '
+               f'cmd:cockpit-bridge']
 
         subprocess.check_call(podman + cmd)
 

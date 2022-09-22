@@ -6,7 +6,7 @@ PORT_3SCALE = 8443
 build: 3scale/certs/service-chain.pem containers
 
 3scale/certs/service-chain.pem:
-	mkdir -p 3scale/certs && cd 3scale/certs && sscg --subject-alt-name localhost
+	mkdir -p 3scale/certs && cd 3scale/certs && sscg --subject-alt-name localhost --subject-alt-name host.containers.internal
 	cat 3scale/certs/service.pem 3scale/certs/ca.crt > $@
 
 containers:
