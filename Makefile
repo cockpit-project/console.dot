@@ -34,6 +34,4 @@ clean:
 check:
 	python3 -m unittest discover -vs test
 
-all: containers
-
-.PHONY: containers run clean all
+.PHONY: containers run clean build
