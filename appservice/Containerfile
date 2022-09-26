@@ -10,9 +10,9 @@ RUN pip3 install redis starlette httpx websockets uvicorn
 
 RUN mkdir -p /usr/local/bin/ && \
     curl -L -o /usr/local/bin/websocat https://github.com/vi/websocat/releases/download/v1.10.0/websocat.x86_64-unknown-linux-musl && \
-    echo 'exec websocat -b -s 0.0.0.0:8080' > /usr/local/bin/socat-session.sh && \
-    chmod a+x /usr/local/bin/websocat /usr/local/bin/socat-session.sh
+    chmod a+x /usr/local/bin/websocat
 
 COPY *.py /usr/local/bin/
+COPY scripts /
 
 CMD python3 /usr/local/bin/multiplexer.py

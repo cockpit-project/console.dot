@@ -44,14 +44,8 @@ async def new_session_podman(sessionid):
         'name': name,
         # for local debugging
         # 'command': ['sleep', 'infinity'],
-        # XXX: http://localhost:8080 origin is for directly connecting to appservice, without 3scale
-        'command': ['sh', '-exc',
-                    f"mkdir -p /tmp/conf/cockpit; "
-                    f"printf '[Webservice]\nUrlRoot={config.ROUTE_WSS}/sessions/{sessionid}/web\\n"
-                    f"Origins = {API_URL} http://localhost:8080\\n'"
-                    "> /tmp/conf/cockpit/cockpit.conf;"
-                    "export XDG_CONFIG_DIRS=/tmp/conf;"
-                    "exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=socat-session.sh"],
+        'command': ['/cockpit-ws-session.sh'],
+        'env': {'API_URL': API_URL, 'ROUTE_WSS': config.ROUTE_WSS, 'SESSION_ID':  sessionid},
         'netns': {'nsmode': 'bridge'},
         # deprecated; use this with podman ≥ 4: 'Networks': {'consoledot': {}},
         'cni_networks': ['consoledot'],
