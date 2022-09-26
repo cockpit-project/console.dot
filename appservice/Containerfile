@@ -2,7 +2,16 @@ FROM docker.io/redhat/ubi9-minimal
 
 # iputils and procps-ng are just for debugging; drop for production
 RUN microdnf install -y python3-pip iputils procps-ng && microdnf clean all
+# cockpit is not available in UBI, install from CentOS 9 stream; c-bridge is just for debugging, drop for production
+RUN printf '[c9s]\nname = C9S\nbaseurl = http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os\ngpgcheck = 0\n' > /etc/yum.repos.d/c9s.repo
+RUN microdnf install --enablerepo=c9s --setopt=install_weak_deps=0 -y cockpit-ws cockpit-bridge && microdnf clean all
+
 RUN pip3 install redis starlette httpx websockets uvicorn
+
+RUN mkdir -p /usr/local/bin/ && \
+    curl -L -o /usr/local/bin/websocat https://github.com/vi/websocat/releases/download/v1.10.0/websocat.x86_64-unknown-linux-musl && \
+    echo 'exec websocat -b -s 0.0.0.0:8080' > /usr/local/bin/socat-session.sh && \
+    chmod a+x /usr/local/bin/websocat /usr/local/bin/socat-session.sh
 
 COPY *.py /usr/local/bin/
 
