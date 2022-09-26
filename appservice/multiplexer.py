@@ -40,7 +40,7 @@ async def handle_ping(request):
 async def new_session_podman(sessionid):
     name = f'session-{sessionid}'
     body = {
-        'image': 'quay.io/rhn_engineering_mpitt/ws',
+        'image': 'localhost/webconsoleapp',
         'name': name,
         # for local debugging
         # 'command': ['sleep', 'infinity'],
@@ -55,7 +55,6 @@ async def new_session_podman(sessionid):
         'netns': {'nsmode': 'bridge'},
         # deprecated; use this with podman ≥ 4: 'Networks': {'consoledot': {}},
         'cni_networks': ['consoledot'],
-        'user': 'cockpit-wsinstance',
     }
 
     async with httpx.AsyncClient(transport=httpx.AsyncHTTPTransport(uds=PODMAN_SOCKET)) as podman:
