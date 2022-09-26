@@ -12,10 +12,9 @@ logger = logging.getLogger(__name__)
 async def ws2out(ws):
     try:
         async for message in ws:
-            logger.debug('ws -> stdout: %s', message)
             os.write(1, message)
     except websockets.exceptions.ConnectionClosedError as e:
-        logger.debug('ws2out: websocket connection got closed: %s', e)
+        logger.info('ws2out: websocket connection got closed: %s', e)
         return
 
 
@@ -23,10 +22,9 @@ async def in2ws(reader, ws):
     while True:
         message = await reader.read(4096)
         if not message:
-            logger.debug('in -> ws: EOF')
+            logger.info('in -> ws: EOF')
             await ws.close()
             break
-        logger.debug('in -> ws: %s', message)
         await ws.send(message)
 
 
@@ -51,5 +49,5 @@ async def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
