@@ -119,6 +119,12 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(response.status, 200)
         self.assertEqual(response.read(), b'wait_target')
 
+        # connecting to the session gives placeholder page
+        response = self.request(f'{self.api_url}{config.ROUTE_WSS}/sessions/{sessionid}/web/')
+        self.assertEqual(response.status, 200)
+        content = response.read()
+        self.assertIn(b'Waiting for target system to connect', content)
+
         # API URL is on the container host's localhost; translate for the container DNS
         websocket_url = self.api_url.replace('localhost', 'host.containers.internal').replace('https:', 'wss:')
         podman = ['podman', 'run', '-d', '--pod', 'webconsoleapp',
@@ -178,9 +184,11 @@ class IntegrationTest(unittest.TestCase):
         # first session still works
         self.checkSession(s1)
         # second session is broken
-        request = self.get_auth_request(f'{self.api_url}{config.ROUTE_WSS}/sessions/{s2}/web/')
-        with self.assertRaises(OSError):
-            urllib.request.urlopen(request, context=self.ssl_3scale, timeout=1)
+        self.wait_status(s2, b'closed')
+        # ... and goes back to the placeholder page
+        response = self.request(f'{self.api_url}{config.ROUTE_WSS}/sessions/{s2}/web/')
+        # FIXME: this should handle "closed" differently
+        self.assertIn(b'Waiting for target system to connect', response.read())
 
         # can create a new session
         s3 = self.newSession()

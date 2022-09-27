@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Console</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>Web Console</h1>
+
+    <p>Waiting for target system to connect. This may take some time...</p>
+
+    <p>Session status: <span id="session-status"></span></p>
+
+    <p id="error"></p>
+
+    <script type="text/javascript">
+        const API = document.URL.replace('/wss/', '/api/').replace(/\/web\/.*$/, '/');
+        const el_status = document.getElementById("session-status");
+        const el_error = document.getElementById("session-status");
+
+        async function callApiText(path) {
+            const response = await fetch(API + path);
+            return await response.text();
+        }
+
+        (async () => {
+            try {
+                // initial status
+                el_status.textContent = await callApiText('status');
+                // wait for running
+                await callApiText('wait-running');
+                el_status.textContent = "running; you will be redirected to the web console";
+                document.location.reload();
+            } catch (ex) {
+                el_error.textContent = JSON.stringify(ex);
+            }
+        })();
+    </script>
+</body>
+</html>
