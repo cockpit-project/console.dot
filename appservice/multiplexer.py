@@ -5,7 +5,7 @@ import logging
 import os
 import socket
 import uuid
-from typing import Dict
+from typing import Dict, List
 
 import httpx
 import redis.exceptions
@@ -29,6 +29,7 @@ K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
 
 # session_id → {status: wait_target or running, ip: session container address}
 SESSIONS: Dict[str, Dict[str, str]] = {}
+WAIT_RUNNING_FUTURES: Dict[str, List[asyncio.Future]] = {}
 
 REDIS = redis.asyncio.Redis(host=os.environ['REDIS_SERVICE_HOST'],
                             port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
@@ -167,6 +168,18 @@ async def handle_session_status(request):
         return PlainTextResponse('unknown session ID', status_code=404)
 
 
+@app.route(f'{config.ROUTE_API}/sessions/{{sessionid}}/wait-running')
+async def handle_session_wait_running(request):
+    sessionid = request.path_params['sessionid']
+    if sessionid not in SESSIONS:
+        return PlainTextResponse('unknown session ID', status_code=404)
+
+    f = asyncio.get_running_loop().create_future()
+    WAIT_RUNNING_FUTURES.setdefault(sessionid, []).append(f)
+    # watch_redis() resolves f
+    return PlainTextResponse(await f)
+
+
 async def ws_up2down(recv_ws: WebSocket, send_ws: websockets.WebSocketClientProtocol):
     while True:
         msg = await recv_ws.receive()
@@ -284,6 +297,18 @@ async def watch_redis(channel):
                     except json.decoder.JSONDecodeError as e:
                         logger.warning('invalid JSON, starting without sessions: %s', e)
                         SESSIONS = {}
+
+                    # resolve wait-running futures
+                    logger.debug('watch_redis WAIT_RUNNING_FUTURES before: %s', WAIT_RUNNING_FUTURES)
+                    for sessionid, wait_futures in WAIT_RUNNING_FUTURES.items():
+                        if SESSIONS.get(sessionid, {}).get('status') != 'running':
+                            continue
+
+                        for f in wait_futures.copy():
+                            logger.debug('session %s status is running, resolving wait-running', sessionid)
+                            f.set_result(None)
+                            wait_futures.remove(f)
+                    logger.debug('watch_redis WAIT_RUNNING_FUTURES after: %s', WAIT_RUNNING_FUTURES)
 
                 await asyncio.sleep(0.01)
         except asyncio.TimeoutError:

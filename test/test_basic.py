@@ -134,7 +134,10 @@ class IntegrationTest(unittest.TestCase):
         subprocess.check_call(podman + cmd)
 
         # successful bridge connection updates status
-        self.wait_status(sessionid, b'running')
+        response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/{sessionid}/wait-running')
+        self.assertEqual(response.status, 200)
+        response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/{sessionid}/status')
+        self.assertEqual(response.read(), b'running')
 
         return sessionid
 
