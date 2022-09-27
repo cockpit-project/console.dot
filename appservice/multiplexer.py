@@ -17,7 +17,7 @@ import websockets.exceptions
 from starlette.applications import Starlette
 from starlette.background import BackgroundTask
 from starlette.concurrency import run_until_first_complete
-from starlette.responses import PlainTextResponse, JSONResponse, StreamingResponse
+from starlette.responses import HTMLResponse, PlainTextResponse, JSONResponse, StreamingResponse
 from starlette.websockets import WebSocket
 
 import config
@@ -27,6 +27,7 @@ SESSION_INSTANCE_DOMAIN = os.getenv('SESSION_INSTANCE_DOMAIN', '')
 PODMAN_SOCKET = '/run/podman/podman.sock'
 K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
 
+MY_DIR = os.path.dirname(__file__)
 # session_id → {status: wait_target or running, ip: session container address}
 SESSIONS: Dict[str, Dict[str, str]] = {}
 WAIT_RUNNING_FUTURES: Dict[str, List[asyncio.Future]] = {}
@@ -35,6 +36,9 @@ REDIS = redis.asyncio.Redis(host=os.environ['REDIS_SERVICE_HOST'],
                             port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
 logger = logging.getLogger('multiplexer')
 app = Starlette()
+
+with open(os.path.join(MY_DIR, 'wait-session.html')) as f:
+    HTML_WAIT_SESSION = f.read()
 
 
 @app.route(f'{config.ROUTE_API}/ping')
@@ -262,11 +266,13 @@ async def handle_session_id_http(upstream_req):
     '''reverse-proxy cockpit HTTP to session pod'''
 
     sessionid = upstream_req.path_params['sessionid']
-    if sessionid not in SESSIONS:
+    session = SESSIONS.get(sessionid)
+    if session is None:
         return PlainTextResponse('unknown session ID', status_code=404)
+    if session['status'] != 'running':
+        return HTMLResponse(HTML_WAIT_SESSION)
 
-    ip = SESSIONS[sessionid]['ip']
-    target_url = f'http://{ip}:9090{upstream_req.url.path}'
+    target_url = f'http://{session["ip"]}:9090{upstream_req.url.path}'
 
     client = httpx.AsyncClient()
     downstream_req = client.build_request(

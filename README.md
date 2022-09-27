@@ -27,6 +27,14 @@ This requires `podman` and `sscg` to be available on the host.
    make run
    ```
 
+ - Prepare some target machine on which you want to get a Cockpit session; this can just be a local VM.
+   It needs to have Cockpit ≥ 275 installed, at least the `cockpit-system` and `cockpit-bridge` packages.
+   You also need to copy `server/cockpit-bridge-websocket-connector.pyz` to the target machine (in the
+   final product this will be transmitted through Ansible):
+   ```
+   scp server/cockpit-bridge-websocket-connector.pyz target_machine:/tmp/
+   ```
+
  - Register a new session:
    ```
    curl -u admin:foobar --cacert 3scale/certs/ca.crt https://localhost:8443/api/webconsole/v1/sessions/new
@@ -37,13 +45,11 @@ This requires `podman` and `sscg` to be available on the host.
    {"id": "f835d542-b9ac-4329-a16a-b935036b4aa5"}
    ```
 
- - Pick some target machine/VM on which you want to get a Cockpit session; this can just be a local VM.
-   It needs to have Cockpit ≥ 275 installed, at least the `cockpit-system` and `cockpit-bridge` packages.
-   You also need to copy `server/cockpit-bridge-websocket-connector.pyz` to the target machine (in the
-   final product this will be transmitted through Ansible):
-   ```
-   scp server/cockpit-bridge-websocket-connector.pyz target_machine:/tmp/
-   ```
+ - Open the session in a browser:
+
+   https://localhost:8443/wss/webconsole/v1/sessions/SESSION_ID/web/
+
+   This is a stub page that waits until the target machine connects.
 
  - Connect the target machine to the ws session container. In a VM with a
    recent systemd nss-myhostname (like Fedora), you can use the `_gateway`
@@ -55,9 +61,7 @@ This requires `podman` and `sscg` to be available on the host.
    /tmp/cockpit-bridge-websocket-connector.pyz --basic-auth admin:foobar -k wss://_gateway:8443/wss/webconsole/v1/sessions/SESSION_ID/ws
    ```
 
- - Open Cockpit in a browser:
-
-   https://localhost:8443/wss/webconsole/v1/sessions/SESSION_ID/web/
+   This should cause the stub page to automatically reload, and show the actual Cockpit UI.
 
  - Clean up:
    ```
@@ -115,13 +119,13 @@ Both get deployed with
 
    It should be "wait_target".
 
-5. Now connect the target VM to the session pod:
+5. In the mitmproxy Firefox profile, open https://test.cloud.redhat.com/wss/webconsole/v1/sessions/SESSIONID/web/ to get the "waiting for target machine" stub page.
+
+6. Connect the target VM to the session pod:
 
       /tmp/cockpit-bridge-websocket-connector.pyz --basic-auth user:password -k wss://test.cloud.redhat.com/wss/webconsole/v1/sessions/SESSIONID/ws
 
-   Check the session status again, it should now be "running".
-
-6. In the mitmproxy Firefox profile, open https://test.cloud.redhat.com/wss/webconsole/v1/sessions/SESSIONID/web/ . You should now get a Cockpit UI for the user you started the bridge as.
+   You should now also get a Cockpit UI for the user you started the bridge as. If you check the session status again, it should be "running".
 
 You can run
 
