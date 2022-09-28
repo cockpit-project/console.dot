@@ -12,6 +12,7 @@ import redis.exceptions
 import redis.asyncio
 import uvicorn
 import websockets
+import websockets.exceptions
 
 from starlette.applications import Starlette
 from starlette.background import BackgroundTask
@@ -178,7 +179,12 @@ async def ws_up2down(recv_ws: WebSocket, send_ws: websockets.WebSocketClientProt
 
 async def ws_down2up(recv_ws: websockets.WebSocketClientProtocol, send_ws: WebSocket):
     while True:
-        data = await recv_ws.recv()
+        try:
+            data = await recv_ws.recv()
+        except websockets.exceptions.ConnectionClosed as e:
+            logger.info('%s closed: %s', send_ws.url.path, e)
+            break
+
         if isinstance(data, str):
             await send_ws.send_text(data)
         else:
@@ -222,6 +228,7 @@ async def handle_session_id_bridge(ws: WebSocket):
         asyncio.create_task(update_session(sessionid, 'running'))
     ip = SESSIONS[sessionid]['ip']
     await websocket_forward(ws, f'ws://{ip}:8080{ws.url.path}')
+    await update_session(sessionid, 'closed')
 
 
 @app.websocket_route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/web/{{path:path}}')
@@ -234,6 +241,7 @@ async def handle_session_id_ws(ws: WebSocket):
         return
     ip = SESSIONS[sessionid]['ip']
     await websocket_forward(ws, f'ws://{ip}:9090{ws.url.path}')
+    await update_session(sessionid, 'closed')
 
 
 @app.route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/web/{{path:path}}', methods=['GET', 'HEAD'])
