@@ -13,9 +13,9 @@ spec:
   source:
     type: Git
     git:
-      uri: https://github.com/jelly/console.dot
-      # FIXME: drop after landing https://github.com/jelly/console.dot/pull/38
-      ref: k8s
+      uri: https://github.com/cockpit-project/console.dot
+      # you can build from a proposed branch for testing with
+      # ref: branchname
     contextDir: appservice
   strategy:
     type: Docker
