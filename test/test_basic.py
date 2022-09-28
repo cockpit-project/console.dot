@@ -73,13 +73,13 @@ class IntegrationTest(unittest.TestCase):
         request.add_header('Authorization', f'Basic {b64}')
         return request
 
-    def request(self, url, retries=0):
+    def request(self, url, retries=0, timeout=1):
         request = self.get_auth_request(url)
         tries = 0
         last_exc = None
         while tries <= retries:
             try:
-                response = urllib.request.urlopen(request, context=self.ssl_3scale, timeout=1)
+                response = urllib.request.urlopen(request, context=self.ssl_3scale, timeout=timeout)
                 if response.status >= 200 and response.status < 300:
                     return response
             except urllib.error.HTTPError as exc:
@@ -97,13 +97,13 @@ class IntegrationTest(unittest.TestCase):
         self.fail(f'timeout reached trying to request {url}: {last_exc}')
 
     def newSession(self):
-        response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new')
+        response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new', timeout=10)
         self.assertEqual(response.status, 200)
         self.assertEqual(response.getheader('Content-Type'), 'application/json')
         sessionid = json.load(response)['id']
         self.assertIsInstance(sessionid, str)
 
-        # inital status
+        # initial status
         response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/{sessionid}/status')
         self.assertEqual(response.status, 200)
         self.assertEqual(response.read(), b'wait_target')
