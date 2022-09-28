@@ -27,7 +27,7 @@ SESSION_INSTANCE_DOMAIN = os.getenv('SESSION_INSTANCE_DOMAIN', '')
 PODMAN_SOCKET = '/run/podman/podman.sock'
 K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
 
-# session_id → {state: wait_target or running, ip: session container address}
+# session_id → {status: wait_target or running, ip: session container address}
 SESSIONS: Dict[str, Dict[str, str]] = {}
 
 REDIS = redis.asyncio.Redis(host=os.environ['REDIS_SERVICE_HOST'],
@@ -146,7 +146,7 @@ async def handle_session_new(request):
                 continue
 
             logger.debug('session pod %s resolves to %s', session_hostname, addr)
-            SESSIONS[sessionid] = {'ip': addr, 'state': None}
+            SESSIONS[sessionid] = {'ip': addr, 'status': None}
             await update_session(sessionid, 'wait_target')
             response = JSONResponse({'id': sessionid})
             break
