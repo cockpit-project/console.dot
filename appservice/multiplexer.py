@@ -3,7 +3,9 @@ import asyncio
 import json
 import logging
 import os
+import socket
 import uuid
+from typing import Dict
 
 import httpx
 import redis.exceptions
@@ -24,8 +26,8 @@ SESSION_INSTANCE_DOMAIN = os.getenv('SESSION_INSTANCE_DOMAIN', '')
 PODMAN_SOCKET = '/run/podman/podman.sock'
 K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
 
-# states: wait_target or running
-SESSIONS = {}
+# session_id → {state: wait_target or running, ip: session container address}
+SESSIONS: Dict[str, Dict[str, str]] = {}
 
 REDIS = redis.asyncio.Redis(host=os.environ['REDIS_SERVICE_HOST'],
                             port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
@@ -115,6 +117,8 @@ spec:
 
 @app.route(f'{config.ROUTE_API}/sessions/new')
 async def handle_session_new(request):
+    global SESSIONS
+
     sessionid = str(uuid.uuid4())
     assert sessionid not in SESSIONS
 
@@ -130,8 +134,23 @@ async def handle_session_new(request):
     logger.debug('new_session result status %i, content: %s', pod_status, content)
 
     if pod_status >= 200 and pod_status < 300:
-        response = JSONResponse({'id': sessionid})
-        await update_session(sessionid, 'wait_target')
+        session_hostname = f'session-{sessionid}{SESSION_INSTANCE_DOMAIN}'
+        # resolve and cache IP addresses now, to avoid DNS lag/trouble during proxying
+        for retry in range(30):
+            try:
+                addr = socket.gethostbyname(session_hostname)
+            except socket.gaierror as e:
+                logger.debug('resolving %s failed, attempt #%i: %s', session_hostname, retry, e)
+                await asyncio.sleep(1)
+                continue
+
+            logger.debug('session pod %s resolves to %s', session_hostname, addr)
+            SESSIONS[sessionid] = {'ip': addr, 'state': None}
+            await update_session(sessionid, 'wait_target')
+            response = JSONResponse({'id': sessionid})
+            break
+        else:
+            response = PlainTextResponse('timed out waiting for session container to resolve in DNS', status_code=500)
     else:
         response = PlainTextResponse(f'creating session container failed: {content}', status_code=pod_status)
 
@@ -142,7 +161,7 @@ async def handle_session_new(request):
 async def handle_session_status(request):
     sessionid = request.path_params['sessionid']
     try:
-        return PlainTextResponse(SESSIONS[sessionid])
+        return PlainTextResponse(SESSIONS[sessionid]['status'])
     except KeyError:
         return PlainTextResponse('unknown session ID', status_code=404)
 
@@ -199,9 +218,10 @@ async def handle_session_id_bridge(ws: WebSocket):
         await ws.close(reason='unknown session ID', code=404)
         return
 
-    if SESSIONS[sessionid] == 'wait_target':
+    if SESSIONS[sessionid]['status'] == 'wait_target':
         asyncio.create_task(update_session(sessionid, 'running'))
-    await websocket_forward(ws, f'ws://session-{sessionid}{SESSION_INSTANCE_DOMAIN}:8080{ws.url.path}')
+    ip = SESSIONS[sessionid]['ip']
+    await websocket_forward(ws, f'ws://{ip}:8080{ws.url.path}')
 
 
 @app.websocket_route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/web/{{path:path}}')
@@ -212,7 +232,8 @@ async def handle_session_id_ws(ws: WebSocket):
     if sessionid not in SESSIONS:
         await ws.close(reason='unknown session ID', code=404)
         return
-    await websocket_forward(ws, f'ws://session-{sessionid}{SESSION_INSTANCE_DOMAIN}:9090{ws.url.path}')
+    ip = SESSIONS[sessionid]['ip']
+    await websocket_forward(ws, f'ws://{ip}:9090{ws.url.path}')
 
 
 @app.route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/web/{{path:path}}', methods=['GET', 'HEAD'])
@@ -223,7 +244,8 @@ async def handle_session_id_http(upstream_req):
     if sessionid not in SESSIONS:
         return PlainTextResponse('unknown session ID', status_code=404)
 
-    target_url = f'http://session-{sessionid}{SESSION_INSTANCE_DOMAIN}:9090{upstream_req.url.path}'
+    ip = SESSIONS[sessionid]['ip']
+    target_url = f'http://{ip}:9090{upstream_req.url.path}'
 
     client = httpx.AsyncClient()
     downstream_req = client.build_request(
@@ -292,7 +314,7 @@ async def init_sessions():
 
 async def update_session(session_id, status):
     global SESSIONS
-    SESSIONS[session_id] = status
+    SESSIONS[session_id]['status'] = status
     dumped_sessions = json.dumps(SESSIONS)
     await REDIS.set('sessions', dumped_sessions)
     await REDIS.publish('sessions', dumped_sessions)
