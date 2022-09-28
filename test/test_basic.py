@@ -96,6 +96,17 @@ class IntegrationTest(unittest.TestCase):
 
         self.fail(f'timeout reached trying to request {url}: {last_exc}')
 
+    def wait_status(self, sessionid, expected_status, iterations=10):
+        for retry in range(iterations):
+            response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/{sessionid}/status')
+            self.assertEqual(response.status, 200)
+            status = response.read()
+            if status == expected_status:
+                break
+            time.sleep(0.5)
+        else:
+            self.fail(f'session status was not updated to {expected_status}, still at {status}')
+
     def newSession(self):
         response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new', timeout=10)
         self.assertEqual(response.status, 200)
@@ -123,15 +134,7 @@ class IntegrationTest(unittest.TestCase):
         subprocess.check_call(podman + cmd)
 
         # successful bridge connection updates status
-        for retry in range(10):
-            response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/{sessionid}/status')
-            self.assertEqual(response.status, 200)
-            status = response.read()
-            if status == b'running':
-                break
-            time.sleep(0.5)
-        else:
-            self.fail(f'session status was not updated to running, still at {status}')
+        self.wait_status(sessionid, b'running')
 
         return sessionid
 
@@ -181,6 +184,14 @@ class IntegrationTest(unittest.TestCase):
         self.checkSession(s3)
         # first session still works
         self.checkSession(s1)
+
+        # tickle cockpit's websocket, so that it starts the session timeout
+        response = self.request(f'{self.api_url}{config.ROUTE_WSS}/sessions/{s1}/web/cockpit/socket')
+        self.assertEqual(response.status, 200)
+        # the test does not run a browser, so nothing keeps the cockpit websocket alive
+        # this acts like moving to a different URL, and bridge times out the socket due to
+        # lack of pongs after ~ 15s.
+        self.wait_status(s1, b'closed', iterations=40)
 
     def test3scaleErrors(self):
         # unauthenticated
