@@ -93,19 +93,10 @@ Both get deployed with
 3. The hardest part: Due to a [misconfiguration of 3scale](https://issues.redhat.com/browse/COCKPIT-795?focusedCommentId=20703283&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-20703283), browsers don't ask for basic auth. So you need to set up a local proxy that provides the `Authorization:` header for 3scale:
 
    - Download Linux binaries from https://mitmproxy.org/, unpack them
-   - Create `add-header.py`:
-   ```python
-   class AddHeader:
-       def __init__(self):
-           self.num = 0
+   - Run the proxy for adding a header to send basic auth:
 
-       def request(self, flow):
-           flow.request.headers["authorization"] = "Basic bW1hcnVzYWstZXQ6MTIzNDU2Nzg5"
+         ./mitmdump -k -H "/authorization/Basic bW1hcnVzYWstZXQ6MTIzNDU2Nzg5"
 
-   addons = [AddHeader()]
-   ```
-
-   - Run `./mitmdump -k -s add-header.py --no-http2`
    - Run `firefox -P`, create a new "mitm-consoledot" profile
    - Configure the network proxy to be `localhost:8080`, also use it for https.
    - Go to "View certificates", "Authorities", "Import", and import ~/.mitmproxy/mitmproxy-ca-cert.pem , so that the local proxy's https certificate is trusted
