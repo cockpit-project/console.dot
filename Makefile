@@ -24,6 +24,7 @@ server/cockpit-bridge-websocket-connector.pyz: server/cockpit-bridge-websocket-c
 containers:
 	podman build -t $(CONTAINER_NAME) appservice
 	podman build -t $(SERVER_CONTAINER_NAME):stream9 --build-arg tag=stream9 server
+	podman build -t $(SERVER_CONTAINER_NAME):centos8 --build-arg tag=stream8 server
 
 run: 3scale/certs/service-chain.pem
 	[ -z "$$(podman network ls --quiet --filter 'name=$(NETWORK)')" ] || $(MAKE) clean
