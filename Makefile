@@ -16,7 +16,10 @@ server/cockpit-bridge-websocket-connector.pyz: server/cockpit-bridge-websocket-c
 	rm -rf tmp/pyz
 	mkdir -p tmp/pyz
 	cp $< tmp/pyz/cockpit_bridge_websocket_connector.py
-	python3 -m pip install --no-compile --target tmp/pyz/ websockets
+	python3 -m pip install --python-version 3.6 --no-deps --no-compile --target tmp/pyz/ websockets
+	mv tmp/pyz/websockets tmp/pyz/websockets36
+	sed -i '/\bimport\b/ s/\bwebsockets\b/websockets36/' tmp/pyz/websockets36/*.py
+	python3 -m pip install --no-deps --no-compile --target tmp/pyz/ websockets
 	find tmp/pyz/ -name '*.c' -or -name '*.so' -delete
 	python3 -m zipapp --python="/usr/bin/env python3" --compress --output $@ --main cockpit_bridge_websocket_connector:main tmp/pyz
 	chmod a+x $@
