@@ -37,7 +37,7 @@ This requires `podman` and `sscg` to be available on the host.
 
  - Register a new session:
    ```
-   curl -u admin:foobar --cacert 3scale/certs/ca.crt https://localhost:8443/api/webconsole/v1/sessions/new
+   curl -X POST -u admin:foobar --cacert 3scale/certs/ca.crt https://localhost:8443/api/webconsole/v1/sessions/new
    ```
 
    This returns the session ID in a JSON object:
@@ -107,7 +107,7 @@ Both get deployed with
 
 4. Request a new session from the API:
 
-       curl -u user:password https://test.cloud.redhat.com/api/webconsole/v1/sessions/new
+       curl -X POST -u user:password https://test.cloud.redhat.com/api/webconsole/v1/sessions/new
 
    This will respond with a Session ID, like this:
 
