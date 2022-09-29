@@ -73,13 +73,13 @@ class IntegrationTest(unittest.TestCase):
         request.add_header('Authorization', f'Basic {b64}')
         return request
 
-    def request(self, url, retries=0, timeout=1):
+    def request(self, url, retries=0, timeout=1, data=None):
         request = self.get_auth_request(url)
         tries = 0
         last_exc = None
         while tries <= retries:
             try:
-                response = urllib.request.urlopen(request, context=self.ssl_3scale, timeout=timeout)
+                response = urllib.request.urlopen(request, context=self.ssl_3scale, timeout=timeout, data=data)
                 if response.status >= 200 and response.status < 300:
                     return response
             except urllib.error.HTTPError as exc:
@@ -108,7 +108,7 @@ class IntegrationTest(unittest.TestCase):
             self.fail(f'session status was not updated to {expected_status}, still at {status}')
 
     def newSession(self, tag='stream9'):
-        response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new', timeout=10)
+        response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new', timeout=10, data=b'')
         self.assertEqual(response.status, 200)
         self.assertEqual(response.getheader('Content-Type'), 'application/json')
         sessionid = json.load(response)['id']
