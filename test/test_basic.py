@@ -127,7 +127,7 @@ class IntegrationTest(unittest.TestCase):
 
         # API URL is on the container host's localhost; translate for the container DNS
         websocket_url = self.api_url.replace('localhost', 'host.containers.internal').replace('https:', 'wss:')
-        podman = ['podman', 'run', '-d', '--pod', 'webconsoleapp',
+        podman = ['podman', 'run', '-d', f'--name=server-{sessionid}', '--pod', 'webconsoleapp',
                   '--volume', './3scale/certs/ca.crt:/etc/pki/ca-trust/source/anchors/3scale-ca.crt:ro',
                   # in production, the bridge connector gets sent to target system via Ansible
                   '--volume', './server:/server:ro',
@@ -188,6 +188,9 @@ class IntegrationTest(unittest.TestCase):
         # ... and goes to the "closed session" placeholder page
         response = self.request(f'{self.api_url}{config.ROUTE_WSS}/sessions/{s2}/web/')
         self.assertIn(b'Web Console session ended', response.read())
+        # server notices the EOF and exits
+        status = subprocess.check_output(['podman', 'inspect', '--format="{{.State.Status}}"', f'server-{s2}'])
+        self.assertEqual(status.strip(), b'"exited"')
 
         # can create a new session
         s3 = self.newSession()
@@ -202,6 +205,9 @@ class IntegrationTest(unittest.TestCase):
         # this acts like moving to a different URL, and bridge times out the socket due to
         # lack of pongs after ~ 15s.
         self.wait_status(s1, b'closed', iterations=40)
+        # server notices the EOF and exits
+        status = subprocess.check_output(['podman', 'inspect', '--format="{{.State.Status}}"', f'server-{s1}'])
+        self.assertEqual(status.strip(), b'"exited"')
 
     def testSessionCentOS8(self):
         s = self.newSession(tag='centos8')
