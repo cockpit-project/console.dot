@@ -203,6 +203,10 @@ class IntegrationTest(unittest.TestCase):
         # lack of pongs after ~ 15s.
         self.wait_status(s1, b'closed', iterations=40)
 
+    def testSessionCentOS8(self):
+        s = self.newSession(tag='centos8')
+        self.checkSession(s)
+
     def test3scaleErrors(self):
         # unauthenticated
         with self.assertRaises(urllib.error.HTTPError) as cm:
