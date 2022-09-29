@@ -6,12 +6,22 @@ import asyncio.subprocess
 import base64
 import logging
 import ssl
-
-import websockets
+import sys
 
 logger = logging.getLogger(__name__)
 
 BRIDGE = 'cockpit-bridge'
+
+
+# API shims for Python 3.6 (in RHEL 8)
+if sys.version_info < (3, 7, 0):
+    loop = asyncio.get_event_loop()
+    asyncio.create_task = loop.create_task
+    asyncio.run = loop.run_until_complete
+    # older version compatible with Python 3.6
+    import websockets36 as websockets
+else:
+    import websockets
 
 
 def parse_args():
