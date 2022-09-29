@@ -107,7 +107,7 @@ class IntegrationTest(unittest.TestCase):
         else:
             self.fail(f'session status was not updated to {expected_status}, still at {status}')
 
-    def newSession(self):
+    def newSession(self, tag='stream9'):
         response = self.request(f'{self.api_url}{config.ROUTE_API}/sessions/new', timeout=10)
         self.assertEqual(response.status, 200)
         self.assertEqual(response.getheader('Content-Type'), 'application/json')
@@ -128,12 +128,12 @@ class IntegrationTest(unittest.TestCase):
         # API URL is on the container host's localhost; translate for the container DNS
         websocket_url = self.api_url.replace('localhost', 'host.containers.internal').replace('https:', 'wss:')
         podman = ['podman', 'run', '-d', '--pod', 'webconsoleapp',
-                  '--volume', './3scale/certs/ca.crt:/usr/local/share/ca-certificates/3scale-ca.crt:ro',
+                  '--volume', './3scale/certs/ca.crt:/etc/pki/ca-trust/source/anchors/3scale-ca.crt:ro',
                   # in production, the bridge connector gets sent to target system via Ansible
                   '--volume', './server:/server:ro',
-                  '--network', 'consoledot', 'localhost/webconsoleserver']
+                  '--network', 'consoledot', f'localhost/webconsoleserver:{tag}']
         cmd = ['sh', '-exc',
-               f'update-ca-certificates; '
+               f'update-ca-trust; '
                f'/server/cockpit-bridge-websocket-connector.pyz --basic-auth admin:foobar'
                f' {websocket_url}{config.ROUTE_WSS}/sessions/{sessionid}/ws']
 

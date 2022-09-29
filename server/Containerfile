@@ -1,7 +1,7 @@
 # Test container image that represents a remote managed server which connects
 # to consoledot. This illustrates the minimum dependencies.
-FROM debian:bookworm
 
-RUN apt-get update && \
-    apt-get install -y cockpit-bridge cockpit-system ca-certificates python3 && \
-    apt-get clean
+ARG tag
+FROM quay.io/centos/centos:$tag
+
+RUN dnf install -y cockpit-system python3 && dnf clean all
