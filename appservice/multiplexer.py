@@ -39,6 +39,8 @@ app = Starlette()
 
 with open(os.path.join(MY_DIR, 'wait-session.html')) as f:
     HTML_WAIT_SESSION = f.read()
+with open(os.path.join(MY_DIR, 'closed-session.html')) as f:
+    HTML_CLOSED_SESSION = f.read()
 
 
 @app.route(f'{config.ROUTE_API}/ping')
@@ -269,7 +271,9 @@ async def handle_session_id_http(upstream_req):
     session = SESSIONS.get(sessionid)
     if session is None:
         return PlainTextResponse('unknown session ID', status_code=404)
-    if session['status'] != 'running':
+    if session['status'] == 'closed':
+        return HTMLResponse(HTML_CLOSED_SESSION)
+    elif session['status'] != 'running':
         return HTMLResponse(HTML_WAIT_SESSION)
 
     target_url = f'http://{session["ip"]}:9090{upstream_req.url.path}'
