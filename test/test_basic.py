@@ -185,10 +185,9 @@ class IntegrationTest(unittest.TestCase):
         self.checkSession(s1)
         # second session is broken
         self.wait_status(s2, b'closed')
-        # ... and goes back to the placeholder page
+        # ... and goes to the "closed session" placeholder page
         response = self.request(f'{self.api_url}{config.ROUTE_WSS}/sessions/{s2}/web/')
-        # FIXME: this should handle "closed" differently
-        self.assertIn(b'Waiting for target system to connect', response.read())
+        self.assertIn(b'Web Console session ended', response.read())
 
         # can create a new session
         s3 = self.newSession()
