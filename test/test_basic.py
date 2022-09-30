@@ -134,14 +134,16 @@ class IntegrationTest(unittest.TestCase):
         # API URL is on the container host's localhost; translate for the container DNS
         websocket_url = self.api_url.replace('localhost', 'host.containers.internal').replace('https:', 'wss:')
         podman = ['podman', 'run', '-d', f'--name=server-{sessionid}', '--pod', 'webconsoleapp',
-                  '--volume', './3scale/certs/ca.crt:/etc/pki/ca-trust/source/anchors/3scale-ca.crt:ro',
+                  '--volume', './3scale/certs:/certs:ro',
                   # in production, the bridge connector gets sent to target system via Ansible
                   '--volume', './server:/server:ro',
                   '--network', 'consoledot', f'localhost/webconsoleserver:{tag}']
         cmd = ['sh', '-exc',
+               f'cp /certs/ca.crt /etc/pki/ca-trust/source/anchors/3scale-ca.crt; '
                f'update-ca-trust; '
-               f'/server/cockpit-bridge-websocket-connector.pyz --basic-auth admin:foobar'
-               f' {websocket_url}{config.ROUTE_WSS}/sessions/{sessionid}/ws']
+               f'/server/cockpit-bridge-websocket-connector.pyz '
+               '--tls-cert /certs/client.crt --tls-key /certs/client.key '
+               f'{websocket_url}{config.ROUTE_WSS}/sessions/{sessionid}/ws']
 
         subprocess.check_call(podman + cmd)
 
