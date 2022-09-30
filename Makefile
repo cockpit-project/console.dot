@@ -6,7 +6,9 @@ PORT_3SCALE = 8443
 build: 3scale/certs/service-chain.pem server/cockpit-bridge-websocket-connector.pyz containers
 
 3scale/certs/service-chain.pem:
-	mkdir -p 3scale/certs && cd 3scale/certs && sscg --subject-alt-name localhost --subject-alt-name host.containers.internal
+	mkdir -p 3scale/certs
+	cd 3scale/certs && sscg --subject-alt-name localhost --subject-alt-name host.containers.internal \
+		--client-file=client.crt --client-key-file=client.key
 	cat 3scale/certs/service.pem 3scale/certs/ca.crt > $@
 
 # bundle https://pypi.org/project/websockets; it's packaged everywhere, but we
