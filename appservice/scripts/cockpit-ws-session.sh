@@ -6,4 +6,4 @@ set -eux
 mkdir -p /tmp/conf/cockpit
 printf "[Webservice]\nUrlRoot=${ROUTE_WSS}/sessions/${SESSION_ID}/web\nOrigins = ${API_URL}\n" > /tmp/conf/cockpit/cockpit.conf
 export XDG_CONFIG_DIRS=/tmp/conf
-exec /usr/libexec/cockpit-ws --for-tls-proxy --local-session=/websocket-session.py
+/usr/libexec/cockpit-ws --for-tls-proxy --local-session=/websocket-session.py

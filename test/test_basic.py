@@ -15,6 +15,12 @@ from appservice import config
 projroot = os.path.dirname(os.path.dirname(__file__))
 
 
+def container_status(name):
+    status = subprocess.check_output(['podman', 'inspect', '--format="{{.State.Status}}"', name],
+                                     universal_newlines=True)
+    return status.strip()
+
+
 class IntegrationTest(unittest.TestCase):
 
     def setUp(self):
@@ -189,8 +195,7 @@ class IntegrationTest(unittest.TestCase):
         response = self.request(f'{self.api_url}{config.ROUTE_WSS}/sessions/{s2}/web/')
         self.assertIn(b'Web Console session ended', response.read())
         # server notices the EOF and exits
-        status = subprocess.check_output(['podman', 'inspect', '--format="{{.State.Status}}"', f'server-{s2}'])
-        self.assertEqual(status.strip(), b'"exited"')
+        self.assertEqual(container_status(f'server-{s2}'), '"exited"')
 
         # can create a new session
         s3 = self.newSession()
@@ -206,8 +211,9 @@ class IntegrationTest(unittest.TestCase):
         # lack of pongs after ~ 15s.
         self.wait_status(s1, b'closed', iterations=40)
         # server notices the EOF and exits
-        status = subprocess.check_output(['podman', 'inspect', '--format="{{.State.Status}}"', f'server-{s1}'])
-        self.assertEqual(status.strip(), b'"exited"')
+        self.assertEqual(container_status(f'server-{s1}'), '"exited"')
+        # session container gets cleaned up
+        self.assertEqual(container_status(f'session-{s1}'), '"exited"')
 
     def testSessionCentOS8(self):
         s = self.newSession(tag='centos8')
