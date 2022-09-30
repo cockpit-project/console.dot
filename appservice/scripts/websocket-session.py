@@ -13,7 +13,7 @@ async def ws2out(ws):
     try:
         async for message in ws:
             os.write(1, message)
-    except websockets.exceptions.ConnectionClosedError as e:
+    except websockets.exceptions.ConnectionClosed as e:
         logger.info('ws2out: websocket connection got closed: %s', e)
         return
 
@@ -41,11 +41,12 @@ async def handler(ws):
                                         return_when=asyncio.FIRST_COMPLETED)
     for task in pending:
         task.cancel()
+    ws.ws_server.close()
 
 
 async def main():
-    async with websockets.serve(handler, '', 8080):
-        await asyncio.Future()
+    async with websockets.serve(handler, '', 8080) as server:
+        await server.wait_closed()
 
 
 if __name__ == '__main__':
