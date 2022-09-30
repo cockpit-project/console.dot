@@ -52,3 +52,9 @@ async def main():
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
+
+    # HACK: cockpit-ws does not auto-exit after --local-session ends, or have a flag for it;
+    # but we want to clean up the session container, so kill it
+    cockpit_ws_pid = os.getppid()
+    logger.info('session ended; killing cockpit-ws parent pid %i', cockpit_ws_pid)
+    os.kill(cockpit_ws_pid, 9)
