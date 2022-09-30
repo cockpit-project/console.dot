@@ -26,21 +26,29 @@ API_URL = os.environ['API_URL']
 SESSION_INSTANCE_DOMAIN = os.getenv('SESSION_INSTANCE_DOMAIN', '')
 PODMAN_SOCKET = '/run/podman/podman.sock'
 K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
-
 MY_DIR = os.path.dirname(__file__)
+
+#
+# global state
+#
+
 # session_id → {status: wait_target or running, ip: session container address}
 SESSIONS: Dict[str, Dict[str, str]] = {}
 WAIT_RUNNING_FUTURES: Dict[str, List[asyncio.Future]] = {}
-
-REDIS = redis.asyncio.Redis(host=os.environ['REDIS_SERVICE_HOST'],
-                            port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
+# file name → content
+STATIC_HTML: Dict[str, str] = {}
 logger = logging.getLogger('multiplexer')
 app = Starlette()
 
-with open(os.path.join(MY_DIR, 'wait-session.html')) as f:
-    HTML_WAIT_SESSION = f.read()
-with open(os.path.join(MY_DIR, 'closed-session.html')) as f:
-    HTML_CLOSED_SESSION = f.read()
+
+def init():
+    global REDIS, STATIC_HTML
+
+    REDIS = redis.asyncio.Redis(host=os.environ['REDIS_SERVICE_HOST'],
+                                port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
+    for html_name in ('wait-session.html', 'closed-session.html'):
+        with open(os.path.join(MY_DIR, html_name)) as f:
+            STATIC_HTML[html_name] = f.read()
 
 
 @app.route(f'{config.ROUTE_API}/ping')
@@ -272,9 +280,9 @@ async def handle_session_id_http(upstream_req):
     if session is None:
         return PlainTextResponse('unknown session ID', status_code=404)
     if session['status'] == 'closed':
-        return HTMLResponse(HTML_CLOSED_SESSION)
+        return HTMLResponse(STATIC_HTML['closed-session.html'])
     elif session['status'] != 'running':
-        return HTMLResponse(HTML_WAIT_SESSION)
+        return HTMLResponse(STATIC_HTML['wait-session.html'])
 
     target_url = f'http://{session["ip"]}:9090{upstream_req.url.path}'
 
@@ -397,4 +405,5 @@ h11.Connection.next_event = hack_h11_con_next_event
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
+    init()
     uvicorn.run(app, host='0.0.0.0', port=8080)
