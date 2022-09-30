@@ -123,7 +123,7 @@ spec:
         return response.status_code, response.text
 
 
-@app.route(f'{config.ROUTE_API}/sessions/new', methods=['POST'])
+@app.route(f'{config.ROUTE_API}/sessions/new')
 async def handle_session_new(request):
     global SESSIONS
 
