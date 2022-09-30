@@ -1,5 +1,6 @@
 import async_timeout
 import asyncio
+import enum
 import json
 import logging
 import os
@@ -28,6 +29,12 @@ PODMAN_SOCKET = '/run/podman/podman.sock'
 K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
 MY_DIR = os.path.dirname(__file__)
 
+
+class Backend(enum.Enum):
+    PODMAN = 0
+    K8S = 1
+
+
 #
 # global state
 #
@@ -37,18 +44,26 @@ SESSIONS: Dict[str, Dict[str, str]] = {}
 WAIT_RUNNING_FUTURES: Dict[str, List[asyncio.Future]] = {}
 # file name → content
 STATIC_HTML: Dict[str, str] = {}
+BACKEND = None
 logger = logging.getLogger('multiplexer')
 app = Starlette()
 
 
 def init():
-    global REDIS, STATIC_HTML
+    global REDIS, STATIC_HTML, BACKEND
 
     REDIS = redis.asyncio.Redis(host=os.environ['REDIS_SERVICE_HOST'],
                                 port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
     for html_name in ('wait-session.html', 'closed-session.html'):
         with open(os.path.join(MY_DIR, html_name)) as f:
             STATIC_HTML[html_name] = f.read()
+
+    if os.path.exists(K8S_SERVICE_ACCOUNT):
+        BACKEND = Backend.K8S
+    elif os.path.exists(PODMAN_SOCKET):
+        BACKEND = Backend.PODMAN
+    else:
+        raise NotImplementedError('cannot create sessions without kubernetes or podman')
 
 
 @app.route(f'{config.ROUTE_API}/ping')
@@ -138,14 +153,14 @@ async def handle_session_new(request):
     sessionid = str(uuid.uuid4())
     assert sessionid not in SESSIONS
 
-    if os.path.exists(K8S_SERVICE_ACCOUNT):
+    if BACKEND == Backend.K8S:
         logger.debug('new_session: creating %s with k8s', sessionid)
         pod_status, content = await new_session_k8s(sessionid)
-    elif os.path.exists(PODMAN_SOCKET):
+    elif BACKEND == Backend.PODMAN:
         logger.debug('new_session: creating %s with podman', sessionid)
         pod_status, content = await new_session_podman(sessionid)
     else:
-        raise NotImplementedError('cannot create sessions without kubernetes or podman')
+        raise NotImplementedError(f'unknown backend {BACKEND}')
 
     logger.debug('new_session result status %i, content: %s', pod_status, content)
 
