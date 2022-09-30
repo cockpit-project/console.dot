@@ -29,10 +29,10 @@ This requires `podman` and `sscg` to be available on the host.
 
  - Prepare some target machine on which you want to get a Cockpit session; this can just be a local VM.
    It needs to have Cockpit ≥ 275 installed, at least the `cockpit-system` and `cockpit-bridge` packages.
-   You also need to copy `server/cockpit-bridge-websocket-connector.pyz` to the target machine (in the
-   final product this will be transmitted through Ansible):
+   Copy `server/cockpit-bridge-websocket-connector.pyz` and the mock client certificate to the target machine
+   (in the final product the connector will be transmitted through Ansible, and use the actual RSHM cert):
    ```
-   scp server/cockpit-bridge-websocket-connector.pyz target_machine:/tmp/
+   scp server/cockpit-bridge-websocket-connector.pyz 3scale/certs/client.* target_machine:/tmp/
    ```
 
  - Register a new session:
@@ -59,7 +59,7 @@ This requires `podman` and `sscg` to be available on the host.
    Replace `SESSION_ID` with the UUID that the `/new` call returned.
    Run this command as the user for which you want to get a Cockpit session:
    ```
-   /tmp/cockpit-bridge-websocket-connector.pyz --basic-auth admin:foobar -k wss://_gateway:8443/wss/webconsole/v1/sessions/SESSION_ID/ws
+   /tmp/cockpit-bridge-websocket-connector.pyz --tls-cert /tmp/client.crt --tls-key /tmp/client.key -k wss://_gateway:8443/wss/webconsole/v1/sessions/SESSION_ID/ws
    ```
 
    This should cause the stub page to automatically reload, and show the actual Cockpit UI.
@@ -124,7 +124,7 @@ Both get deployed with
 
 6. Connect the target VM to the session pod:
 
-      /tmp/cockpit-bridge-websocket-connector.pyz --basic-auth user:password -k wss://test.cloud.redhat.com/wss/webconsole/v1/sessions/SESSIONID/ws
+      /tmp/cockpit-bridge-websocket-connector.pyz --tls-cert /tmp/client.crt --tls-key /tmp/client.key -k wss://test.cloud.redhat.com/wss/webconsole/v1/sessions/SESSIONID/ws
 
    You should now also get a Cockpit UI for the user you started the bridge as. If you check the session status again, it should be "running".
 

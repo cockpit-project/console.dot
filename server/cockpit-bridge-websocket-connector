@@ -35,8 +35,15 @@ def parse_args():
                         help='Accept invalid certificates and hostnames while connecting to TLS')
     parser.add_argument('--basic-auth', metavar="USER:PASSWORD",
                         help='Authenticate with user/password (for testing)')
+    parser.add_argument('--tls-cert', metavar="PATH", help='Client TLS certificate')
+    parser.add_argument('--tls-key', metavar="PATH", help='Client TLS key')
     parser.add_argument('url', help='Connect to this ws:// or wss:// URL')
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if bool(args.tls_cert) != bool(args.tls_key):
+        parser.error('--tls-cert and --tls-key must both be given')
+
+    return args
 
 
 async def ws2bridge(ws, bridge_input):
@@ -72,6 +79,9 @@ async def bridge(args):
     if args.insecure:
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
+
+    if args.tls_cert:
+        ssl_context.load_cert_chain(args.tls_cert, args.tls_key)
 
     async with websockets.connect(args.url, extra_headers=headers, ssl=ssl_context) as websocket:
         p_bridge = await asyncio.create_subprocess_exec(
