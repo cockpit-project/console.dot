@@ -1,14 +1,15 @@
 FROM docker.io/redhat/ubi9-minimal
 
 # iputils and procps-ng are just for debugging; drop for production
-RUN microdnf install -y python3-pip iputils procps-ng && microdnf clean all
+RUN microdnf install -y python3 iputils procps-ng && microdnf clean all
 # cockpit is not available in UBI, install from CentOS 9 stream; c-bridge is just for debugging, drop for production
 RUN printf '[c9s]\nname = C9S\nbaseurl = http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os\ngpgcheck = 0\n' > /etc/yum.repos.d/c9s.repo
 RUN microdnf install --enablerepo=c9s --setopt=install_weak_deps=0 -y cockpit-ws cockpit-bridge && microdnf clean all
-
-RUN pip3 install redis starlette httpx websockets uvicorn
+# install Python dependencies in venv
+RUN python3 -m venv /venv
+RUN /venv/bin/pip3 install redis starlette httpx websockets uvicorn
 
 COPY *.py *.html /usr/local/bin/
 COPY scripts /
 
-CMD python3 /usr/local/bin/multiplexer.py
+CMD /venv/bin/python3 /usr/local/bin/multiplexer.py
