@@ -54,8 +54,9 @@ This requires `podman` and `sscg` to be available on the host.
  - Connect the target machine to the ws session container. In a VM with a
    recent systemd nss-myhostname (like Fedora), you can use the `_gateway`
    name, otherwise check `ip route`. If you use a remote machine, connect to
-   the host name/IP which runs the console.dot containers.  Replace
-   `SESSION_ID` with the UUID that the `/new` call returned.
+   the host name/IP which runs the console.dot containers. You may have to
+   open the port on your local firewall, e.g. `firewall-cmd --add-port=8443/tcp`.
+   Replace `SESSION_ID` with the UUID that the `/new` call returned.
    Run this command as the user for which you want to get a Cockpit session:
    ```
    /tmp/cockpit-bridge-websocket-connector.pyz --basic-auth admin:foobar -k wss://_gateway:8443/wss/webconsole/v1/sessions/SESSION_ID/ws
