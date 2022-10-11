@@ -5,12 +5,15 @@ import asyncio
 import asyncio.subprocess
 import base64
 import logging
+import re
 import ssl
+import subprocess
 import sys
 
 logger = logging.getLogger(__name__)
 
 BRIDGE = 'cockpit-bridge'
+BRDIGE_MIN_VERSION = 275
 
 
 # API shims for Python 3.6 (in RHEL 8)
@@ -83,9 +86,35 @@ async def bridge(args):
             task.cancel()
 
 
+def check_cockpit_bridge():
+    """Check for presence and minimum version of cockpit-bridge
+    """
+    try:
+        stdout = subprocess.check_output(
+            [BRIDGE, "--version"], universal_newlines=True
+        )
+    except subprocess.CalledProcessError:
+        logger.error("%s command missing.", BRIDGE)
+        return False
+    # ignores minor version number
+    mo = re.search("Version: (\d+)", stdout)
+    if mo is None:
+        logger.error("Bad output from %s --version:\n%s", BRIDGE, stdout)
+        return False
+    version = int(mo.group(1))
+    if version < BRDIGE_MIN_VERSION:
+        logger.error(
+            "Unsupported %s version: %r < %r", BRIDGE, version, BRDIGE_MIN_VERSION
+        )
+        return False
+    return True
+
+
 def main():
     args = parse_args()
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+    if not check_cockpit_bridge():
+        sys.exit(2)
     asyncio.run(bridge(args))
 
 
