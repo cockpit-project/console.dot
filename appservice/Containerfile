@@ -11,4 +11,4 @@ RUN pip3 install redis starlette httpx websockets uvicorn
 COPY *.py *.html /usr/local/bin/
 COPY scripts /
 
-CMD python3 /usr/local/bin/multiplexer.py
+CMD ["python3", "/usr/local/bin/multiplexer.py"]
