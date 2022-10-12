@@ -3,16 +3,38 @@
 <head>
     <title>Web Console</title>
     <meta charset="utf-8">
+    <link rel="stylesheet" href="patternfly.css">
 </head>
 <body>
-    <h1>Web Console</h1>
-
-    <p>Waiting for target system to connect. This may take some time...</p>
-
-    <p>Session status: <span id="session-status"></span></p>
-
-    <p id="error"></p>
-
+  <div id="root" style="height: 100%;">
+    <div tabindex="-1" style="outline: none; height: 100%;">
+      <div class="pf-c-page">
+        <main class="pf-c-page__main" tabindex="-1">
+          <section class="pf-c-page__main-section">
+            <div class="pf-c-page__main-body">
+              <div class="pf-l-gallery pf-m-gutter">
+                <div class="pf-c-empty-state pf-m-sm">
+                  <div class="pf-c-empty-state__content">
+                    <div class="pf-c-empty-state__icon">
+                      <span class="pf-c-spinner" role="progressbar" aria-label="Loading...">
+                        <span class="pf-c-spinner__clipper"></span>
+                        <span class="pf-c-spinner__lead-ball"></span>
+                        <span class="pf-c-spinner__tail-ball"></span>
+                      </span>
+                    </div>
+                    <h2 class="pf-c-title pf-m-lg">Waiting for target system to connect. This may take some time...</h2>
+                    <div class="pf-c-empty-state__body">
+                        Session status: <span id="session-status"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </div>
     <script type="text/javascript">
         const API = document.URL.replace('/wss/', '/api/').replace(/\/web\/.*$/, '/');
         const el_status = document.getElementById("session-status");

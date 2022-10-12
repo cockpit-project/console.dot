@@ -30,7 +30,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.background import BackgroundTask
 from starlette.concurrency import run_until_first_complete
 from starlette.requests import HTTPConnection, Request
-from starlette.responses import HTMLResponse, PlainTextResponse, JSONResponse, StreamingResponse
+from starlette.responses import FileResponse, HTMLResponse, PlainTextResponse, JSONResponse, StreamingResponse
 from starlette.websockets import WebSocket
 
 import config
@@ -382,6 +382,11 @@ async def handle_session_id_ws(websocket: WebSocket):
         return
     await websocket_forward(websocket, f'ws://{session["ip"]}:9090{websocket.url.path}')
     await update_session(sessionid, 'closed')
+
+
+@app.route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/web/patternfly.css', methods=['GET', 'HEAD'])
+async def handle_session_id_css(upstream_req):
+    return FileResponse(os.path.join(MY_DIR, 'patternfly.css'))
 
 
 @app.route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/web/{{path:path}}', methods=['GET', 'HEAD'])
