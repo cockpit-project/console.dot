@@ -10,7 +10,7 @@ jobs:
           sudo apt-get install -y sscg flake8
 
       - name: Clone repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Build containers and credentials
         run: make
