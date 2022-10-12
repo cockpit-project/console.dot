@@ -2,6 +2,7 @@ NETWORK = consoledot
 CONTAINER_NAME = webconsoleapp
 SERVER_CONTAINER_NAME = webconsoleserver
 PORT_3SCALE = 8443
+PATTERNFLY_VERSION = 4.217.1
 
 build: 3scale/certs/service-chain.pem server/cockpit-bridge-websocket-connector.pyz containers
 
@@ -60,5 +61,19 @@ k8s-deploy: k8s-clean
 	oc create -f webconsoleapp-k8s-buildconfig.yaml
 	oc start-build build-webconsoleapp --follow
 	oc create -f webconsoleapp-k8s.yaml
+
+appservice/patternfly.css:
+	rm -rf tmp/patternfly
+	mkdir -p tmp/patternfly
+	cd tmp/patternfly && npm install @patternfly/patternfly@$(PATTERNFLY_VERSION)
+	cd tmp/patternfly/ && cat \
+		node_modules/@patternfly/patternfly/patternfly-base.css \
+		node_modules/@patternfly/patternfly/components/EmptyState/empty-state.css \
+		node_modules/@patternfly/patternfly/components/Spinner/spinner.css \
+		node_modules/@patternfly/patternfly/components/Page/page.css \
+		node_modules/@patternfly/patternfly/components/Masthead/masthead.css \
+		node_modules/@patternfly/patternfly/components/Content/content.css \
+		> patternfly.css
+	gzip tmp/patternfly/patternfly.css > appservice/patternfly.css
 
 .PHONY: containers run clean build k8s-clean k8s-deploy
