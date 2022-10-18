@@ -1,12 +1,13 @@
 import async_timeout
 import asyncio
+import base64
 import enum
 import json
 import logging
 import os
 import socket
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import httpx
 import redis.exceptions
@@ -16,8 +17,18 @@ import websockets
 import websockets.exceptions
 
 from starlette.applications import Starlette
+from starlette.authentication import (
+    requires,
+    AuthCredentials,
+    AuthenticationBackend,
+    AuthenticationError,
+    SimpleUser,
+    UnauthenticatedUser,
+)
+from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.background import BackgroundTask
 from starlette.concurrency import run_until_first_complete
+from starlette.requests import Request
 from starlette.responses import HTMLResponse, PlainTextResponse, JSONResponse, StreamingResponse
 from starlette.websockets import WebSocket
 
@@ -28,6 +39,11 @@ SESSION_INSTANCE_DOMAIN = os.getenv('SESSION_INSTANCE_DOMAIN', '')
 PODMAN_SOCKET = '/run/podman/podman.sock'
 K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
 MY_DIR = os.path.dirname(__file__)
+
+# for testing only
+FAKE_AUTHENTICATION = os.environ.get("FAKE_AUTHENTICATION") == "yes"
+if FAKE_AUTHENTICATION and not API_URL.startswith("https://localhost:"):
+    raise RuntimeError("FAKE_AUTHENTICATION is not supported in production")
 
 
 class Backend(enum.Enum):
@@ -66,8 +82,88 @@ def init():
         raise NotImplementedError('cannot create sessions without kubernetes or podman')
 
 
+#
+# Authentication
+#
+# Parses X-RH-Identity header and sets credentials and user information.
+# Requests without header have no credentials and are unauthenticated.
+
+class AuthScope(str, enum.Enum):
+    """Credential scopes
+
+    An authenticated user has either 'User' or 'System' scope.
+    """
+    authenticated = "authenticated"
+    user = "User"
+    system = "System"
+
+
+class XRHIdentityUser(SimpleUser):
+    """User/System information from x-rh-identity header
+    """
+    def __init__(
+        self, username: Union[int, uuid.UUID], org_id: int, identity_type: str, extra: dict
+    ):
+        super().__init__(username)
+        self.org_id = org_id
+        self.identity_type = identity_type
+        self.extra = extra
+
+    @property
+    def display_name(self) -> str:
+        return f"{self.username} ({self.identity_type}, org: {self.org_id})"
+
+
+class XRHIdentityAuthBackend(AuthenticationBackend):
+    """Authenticate User/System by x-rh-identity header
+    """
+    async def authenticate(self, conn):
+        try:
+            hdr_b64 = conn.headers["x-rh-identity"]
+        except KeyError:
+            # no header, unauthenticated
+            if FAKE_AUTHENTICATION:
+                fake_scope = AuthCredentials(
+                    [AuthScope.authenticated, AuthScope.user, AuthScope.system]
+                )
+                fake_user = XRHIdentityUser(
+                    42, org_id=23, identity_type="User", extra={}
+                )
+                return fake_scope, fake_user
+            else:
+                return AuthCredentials(), UnauthenticatedUser()
+
+        try:
+            identity = json.loads(base64.b64decode(hdr_b64))["identity"]
+        except (ValueError, KeyError):
+            raise AuthenticationError("Invalid x-rh-identity header")
+
+        org_id = int(identity["org_id"])
+        identity_type = identity["type"]
+
+        if identity_type == "User":
+            subidentity = identity["user"]
+            scope = AuthScope.user
+            user = XRHIdentityUser(
+                int(subidentity["user_id"]), org_id, identity_type, subidentity
+            )
+        elif identity_type == "System":
+            subidentity = identity["system"]
+            scope = AuthScope.system
+            user = XRHIdentityUser(
+                uuid.UUID(subidentity["cn"]), org_id, identity_type, subidentity
+            )
+        else:
+            raise AuthenticationError("Invalid x-rh-identity header")
+
+        return AuthCredentials([AuthScope.authenticated, scope]), user
+
+
+app.add_middleware(AuthenticationMiddleware, backend=XRHIdentityAuthBackend())
+
+
 @app.route(f'{config.ROUTE_API}/ping')
-async def handle_ping(request):
+async def handle_ping(request: Request):
     return PlainTextResponse('pong')
 
 
@@ -147,7 +243,8 @@ spec:
 
 
 @app.route(f'{config.ROUTE_API}/sessions/new', methods=['POST'])
-async def handle_session_new(request):
+@requires([AuthScope.authenticated, AuthScope.user])
+async def handle_session_new(request: Request):
     global SESSIONS
 
     sessionid = str(uuid.uuid4())
@@ -200,7 +297,8 @@ async def handle_session_new(request):
 
 
 @app.route(f'{config.ROUTE_API}/sessions/{{sessionid}}/status')
-async def handle_session_status(request):
+@requires([AuthScope.authenticated])
+async def handle_session_status(request: Request):
     sessionid = request.path_params['sessionid']
     try:
         return PlainTextResponse(SESSIONS[sessionid]['status'])
@@ -209,7 +307,8 @@ async def handle_session_status(request):
 
 
 @app.route(f'{config.ROUTE_API}/sessions/{{sessionid}}/wait-running')
-async def handle_session_wait_running(request):
+@requires([AuthScope.authenticated])
+async def handle_session_wait_running(request: Request):
     sessionid = request.path_params['sessionid']
     if sessionid not in SESSIONS:
         return PlainTextResponse('unknown session ID', status_code=404)
@@ -269,38 +368,42 @@ async def websocket_forward(upstream_ws: WebSocket, target_url: str):
 
 
 @app.websocket_route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/ws')
-async def handle_session_id_bridge(ws: WebSocket):
+@requires([AuthScope.authenticated])
+async def handle_session_id_bridge(websocket: WebSocket):
     '''reverse-proxy bridge websocket to session pod'''
 
-    sessionid = ws.path_params['sessionid']
+    sessionid = websocket.path_params['sessionid']
     if sessionid not in SESSIONS:
-        await ws.close(reason='unknown session ID', code=404)
+        await websocket.close(reason='unknown session ID', code=404)
         return
 
     if SESSIONS[sessionid]['status'] == 'wait_target':
         asyncio.create_task(update_session(sessionid, 'running'))
     ip = SESSIONS[sessionid]['ip']
-    await websocket_forward(ws, f'ws://{ip}:8080{ws.url.path}')
+    await websocket_forward(websocket, f'ws://{ip}:8080{websocket.url.path}')
     await update_session(sessionid, 'closed')
 
 
 @app.websocket_route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/web/{{path:path}}')
-async def handle_session_id_ws(ws: WebSocket):
+@requires([AuthScope.authenticated])
+async def handle_session_id_ws(websocket: WebSocket):
     '''reverse-proxy cockpit websocket to session pod'''
 
-    sessionid = ws.path_params['sessionid']
+    sessionid = websocket.path_params['sessionid']
     if sessionid not in SESSIONS:
-        await ws.close(reason='unknown session ID', code=404)
+        await websocket.close(reason='unknown session ID', code=404)
         return
     ip = SESSIONS[sessionid]['ip']
-    await websocket_forward(ws, f'ws://{ip}:9090{ws.url.path}')
+    await websocket_forward(websocket, f'ws://{ip}:9090{websocket.url.path}')
     await update_session(sessionid, 'closed')
 
 
 @app.route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/web/{{path:path}}', methods=['GET', 'HEAD'])
-async def handle_session_id_http(upstream_req):
+@requires([AuthScope.authenticated])
+async def handle_session_id_http(request: Request):
     '''reverse-proxy cockpit HTTP to session pod'''
 
+    upstream_req = request
     sessionid = upstream_req.path_params['sessionid']
     session = SESSIONS.get(sessionid)
     if session is None:
