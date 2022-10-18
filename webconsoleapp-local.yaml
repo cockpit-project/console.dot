@@ -32,6 +32,8 @@ spec:
           value: https://localhost:{PORT_3SCALE}
         - name: SESSION_INSTANCE_DOMAIN
           value: .dns.podman
+        - name: FAKE_AUTHENTICATION
+          value: "yes"
 
     - name: redis
       image: docker.io/redis
