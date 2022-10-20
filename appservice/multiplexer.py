@@ -40,12 +40,6 @@ PODMAN_SOCKET = '/run/podman/podman.sock'
 K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
 MY_DIR = os.path.dirname(__file__)
 
-# for testing only
-FAKE_AUTHENTICATION = os.environ.get("FAKE_AUTHENTICATION") == "yes"
-if FAKE_AUTHENTICATION and not API_URL.startswith("https://localhost:"):
-    raise RuntimeError("FAKE_AUTHENTICATION is not supported in production")
-
-
 class Backend(enum.Enum):
     PODMAN = 0
     K8S = 1
@@ -55,7 +49,11 @@ class Backend(enum.Enum):
 # global state
 #
 
-# session_id → {status: wait_target or running, ip: session container address}
+# session_id → {
+#     status: wait_target or running,
+#     ip: session container address,
+#     org_id: numeric org id from x-rh-identity header
+# }
 SESSIONS: Dict[str, Dict[str, str]] = {}
 WAIT_RUNNING_FUTURES: Dict[str, List[asyncio.Future]] = {}
 # file name → content
@@ -111,7 +109,7 @@ class XRHIdentityUser(SimpleUser):
 
     @property
     def display_name(self) -> str:
-        return f"{self.username} ({self.identity_type}, org: {self.org_id})"
+        return f"{self.identity_type} {self.username} (org: {self.org_id})"
 
 
 class XRHIdentityAuthBackend(AuthenticationBackend):
@@ -122,20 +120,12 @@ class XRHIdentityAuthBackend(AuthenticationBackend):
             hdr_b64 = conn.headers["x-rh-identity"]
         except KeyError:
             # no header, unauthenticated
-            if FAKE_AUTHENTICATION:
-                fake_scope = AuthCredentials(
-                    [AuthScope.authenticated, AuthScope.user, AuthScope.system]
-                )
-                fake_user = XRHIdentityUser(
-                    42, org_id=23, identity_type="User", extra={}
-                )
-                return fake_scope, fake_user
-            else:
-                return AuthCredentials(), UnauthenticatedUser()
+            return AuthCredentials(), UnauthenticatedUser()
 
         try:
-            identity = json.loads(base64.b64decode(hdr_b64))["identity"]
-        except (ValueError, KeyError):
+            hdr = json.loads(base64.b64decode(hdr_b64))
+            identity = hdr["identity"]
+        except (ValueError, KeyError, TypeError):
             raise AuthenticationError("Invalid x-rh-identity header")
 
         org_id = int(identity["org_id"])
@@ -155,6 +145,8 @@ class XRHIdentityAuthBackend(AuthenticationBackend):
             )
         else:
             raise AuthenticationError("Invalid x-rh-identity header")
+
+        logger.info("Authenticated %r", user.display_name)
 
         return AuthCredentials([AuthScope.authenticated, scope]), user
 
@@ -284,7 +276,7 @@ async def handle_session_new(request: Request):
             addr = info[0][4][0]
 
             logger.debug('session pod %s resolves to %s', session_hostname, addr)
-            SESSIONS[sessionid] = {'ip': addr, 'status': None}
+            SESSIONS[sessionid] = {'ip': addr, 'status': None, 'org_id': request.user.org_id}
             await update_session(sessionid, 'wait_target')
             response = JSONResponse({'id': sessionid})
             break
