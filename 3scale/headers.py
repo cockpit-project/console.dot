@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+import json
+import base64
+
+
 USER_JSON = """
 {
     "identity": {
@@ -66,8 +71,6 @@ SYSTEM_JSON = """
 }
 """
 
-import json
-import base64
 
 for data in SYSTEM_JSON, USER_JSON:
     # remove pretty printing

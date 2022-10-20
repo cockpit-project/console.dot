@@ -40,6 +40,7 @@ PODMAN_SOCKET = '/run/podman/podman.sock'
 K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
 MY_DIR = os.path.dirname(__file__)
 
+
 class Backend(enum.Enum):
     PODMAN = 0
     K8S = 1
