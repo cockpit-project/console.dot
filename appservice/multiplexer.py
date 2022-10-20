@@ -36,6 +36,7 @@ SCHEMAS = SchemaGenerator(
    {"openapi": "3.0.0", "info": {"title": "webconsole", "version": "1.0"}}
 )
 
+
 class Backend(enum.Enum):
     PODMAN = 0
     K8S = 1
