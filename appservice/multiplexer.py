@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import socket
+import sys
 import uuid
 from typing import Dict, List
 
@@ -14,21 +15,26 @@ import redis.asyncio
 import uvicorn
 import websockets
 import websockets.exceptions
+import yaml
 
 from starlette.applications import Starlette
 from starlette.background import BackgroundTask
 from starlette.concurrency import run_until_first_complete
+from starlette.schemas import SchemaGenerator
 from starlette.responses import HTMLResponse, PlainTextResponse, JSONResponse, StreamingResponse
 from starlette.websockets import WebSocket
 
 import config
 
-API_URL = os.environ['API_URL']
+API_URL = None
 SESSION_INSTANCE_DOMAIN = os.getenv('SESSION_INSTANCE_DOMAIN', '')
 PODMAN_SOCKET = '/run/podman/podman.sock'
 K8S_SERVICE_ACCOUNT = '/run/secrets/kubernetes.io/serviceaccount'
 MY_DIR = os.path.dirname(__file__)
 
+SCHEMAS = SchemaGenerator(
+   {"openapi": "3.0.0", "info": {"title": "webconsole", "version": "1.0"}}
+)
 
 class Backend(enum.Enum):
     PODMAN = 0
@@ -50,7 +56,9 @@ app = Starlette()
 
 
 def init():
-    global REDIS, STATIC_HTML, BACKEND
+    global API_URL, REDIS, STATIC_HTML, BACKEND
+
+    API_URL = os.environ['API_URL']
 
     REDIS = redis.asyncio.Redis(host=os.environ['REDIS_SERVICE_HOST'],
                                 port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
@@ -68,7 +76,22 @@ def init():
 
 @app.route(f'{config.ROUTE_API}/ping')
 async def handle_ping(request):
+    """ping
+
+    ---
+    summary: Ping service
+    responses:
+      200:
+        description: Returns pong
+    """
     return PlainTextResponse('pong')
+
+
+@app.route(f'{config.ROUTE_API}/schema', methods=["GET"], include_in_schema=False)
+def handle_schema(request):
+    """Generate OpenAPI schema
+    """
+    return SCHEMAS.OpenAPIResponse(request=request)
 
 
 async def new_session_podman(sessionid):
@@ -148,6 +171,18 @@ spec:
 
 @app.route(f'{config.ROUTE_API}/sessions/new', methods=['POST'])
 async def handle_session_new(request):
+    """Create a new session
+
+    ---
+    summary: Create a new session
+    response:
+      200:
+        description: new session
+        example:
+          '{"id": "42cdaa42-413a-40fa-b5b5-29c2a8ad8555"}'
+      500:
+        description: time out
+    """
     global SESSIONS
 
     sessionid = str(uuid.uuid4())
@@ -190,6 +225,16 @@ async def handle_session_new(request):
 
 @app.route(f'{config.ROUTE_API}/sessions/{{sessionid}}/status')
 async def handle_session_status(request):
+    """Get session status
+
+    ---
+    summary: Get session status
+    response:
+      200:
+        description: session status (running, closed, wait_target)
+      404:
+        description: unknown session id
+    """
     sessionid = request.path_params['sessionid']
     try:
         return PlainTextResponse(SESSIONS[sessionid]['status'])
@@ -199,6 +244,16 @@ async def handle_session_status(request):
 
 @app.route(f'{config.ROUTE_API}/sessions/{{sessionid}}/wait-running')
 async def handle_session_wait_running(request):
+    """Wait for session
+
+    ---
+    summary: Wait for session
+    response:
+      200:
+        description: session is running
+      404:
+        description: unknown session id
+    """
     sessionid = request.path_params['sessionid']
     if sessionid not in SESSIONS:
         return PlainTextResponse('unknown session ID', status_code=404)
@@ -259,7 +314,16 @@ async def websocket_forward(upstream_ws: WebSocket, target_url: str):
 
 @app.websocket_route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/ws')
 async def handle_session_id_bridge(ws: WebSocket):
-    '''reverse-proxy bridge websocket to session pod'''
+    """reverse-proxy bridge websocket to session pod
+
+    ---
+    summary: reverse-proxy bridge websocket to session pod
+    response:
+      200:
+        description: success
+      404:
+        description: unknown session id
+    """
 
     sessionid = ws.path_params['sessionid']
     if sessionid not in SESSIONS:
@@ -275,8 +339,16 @@ async def handle_session_id_bridge(ws: WebSocket):
 
 @app.websocket_route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/web/{{path:path}}')
 async def handle_session_id_ws(ws: WebSocket):
-    '''reverse-proxy cockpit websocket to session pod'''
+    """reverse-proxy cockpit websocket to session pod
 
+    ---
+    summary: reverse-proxy cockpit websocket to session pod
+    response:
+      200:
+        description: success
+      404:
+        description: unknown session id
+    """
     sessionid = ws.path_params['sessionid']
     if sessionid not in SESSIONS:
         await ws.close(reason='unknown session ID', code=404)
@@ -288,7 +360,16 @@ async def handle_session_id_ws(ws: WebSocket):
 
 @app.route(f'{config.ROUTE_WSS}/sessions/{{sessionid}}/web/{{path:path}}', methods=['GET', 'HEAD'])
 async def handle_session_id_http(upstream_req):
-    '''reverse-proxy cockpit HTTP to session pod'''
+    """reverse-proxy cockpit HTTP to session pod
+
+    ---
+    summary: reverse-proxy cockpit HTTP to session pod
+    response:
+      200:
+        description: success
+      404:
+        description: unknown session id
+    """
 
     sessionid = upstream_req.path_params['sessionid']
     session = SESSIONS.get(sessionid)
@@ -420,5 +501,9 @@ h11.Connection.next_event = hack_h11_con_next_event
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
+    if sys.argv[-1] == "schema":
+        schema = SCHEMAS.get_schema(routes=app.routes)
+        print(yaml.dump(schema, default_flow_style=False))
+        sys.exit(0)
     init()
     uvicorn.run(app, host='0.0.0.0', port=8080)
