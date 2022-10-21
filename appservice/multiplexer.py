@@ -165,15 +165,26 @@ async def handle_session_new(request):
     logger.debug('new_session result status %i, content: %s', pod_status, content)
 
     if pod_status >= 200 and pod_status < 300:
+        loop = asyncio.get_running_loop()
         session_hostname = f'session-{sessionid}{SESSION_INSTANCE_DOMAIN}'
         # resolve and cache IP addresses now, to avoid DNS lag/trouble during proxying
         for retry in range(30):
             try:
-                addr = socket.gethostbyname(session_hostname)
+                info = await loop.getaddrinfo(
+                    session_hostname, 8080, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM
+                )
             except socket.gaierror as e:
                 logger.debug('resolving %s failed, attempt #%i: %s', session_hostname, retry, e)
                 await asyncio.sleep(1)
                 continue
+
+            if not info:
+                logger.debug('getaddrinfo(%s) returned empty result, attempt #%i', session_hostname, retry)
+                await asyncio.sleep(1)
+                continue
+
+            # first result, sockaddr field, first entry is IPv4/IPv6 address
+            addr = info[0][4][0]
 
             logger.debug('session pod %s resolves to %s', session_hostname, addr)
             SESSIONS[sessionid] = {'ip': addr, 'status': None}
