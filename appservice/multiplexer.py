@@ -7,7 +7,7 @@ import logging
 import os
 import socket
 import uuid
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 import httpx
 import redis.exceptions
@@ -25,10 +25,11 @@ from starlette.authentication import (
     SimpleUser,
     UnauthenticatedUser,
 )
+from starlette.exceptions import HTTPException
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.background import BackgroundTask
 from starlette.concurrency import run_until_first_complete
-from starlette.requests import Request
+from starlette.requests import HTTPConnection, Request
 from starlette.responses import HTMLResponse, PlainTextResponse, JSONResponse, StreamingResponse
 from starlette.websockets import WebSocket
 
@@ -55,7 +56,7 @@ class Backend(enum.Enum):
 #     ip: session container address,
 #     org_id: numeric org id from x-rh-identity header
 # }
-SESSIONS: Dict[str, Dict[str, str]] = {}
+SESSIONS: Dict[str, Dict[str, Union[str, int]]] = {}
 WAIT_RUNNING_FUTURES: Dict[str, List[asyncio.Future]] = {}
 # file name → content
 STATIC_HTML: Dict[str, str] = {}
@@ -281,20 +282,14 @@ async def handle_session_new(request: Request):
 @app.route(f'{config.ROUTE_API}/sessions/{{sessionid}}/status')
 @requires([AuthScope.authenticated])
 async def handle_session_status(request: Request):
-    sessionid = request.path_params['sessionid']
-    try:
-        return PlainTextResponse(SESSIONS[sessionid]['status'])
-    except KeyError:
-        return PlainTextResponse('unknown session ID', status_code=404)
+    _, session = get_session(request)
+    return PlainTextResponse(session['status'])
 
 
 @app.route(f'{config.ROUTE_API}/sessions/{{sessionid}}/wait-running')
 @requires([AuthScope.authenticated])
 async def handle_session_wait_running(request: Request):
-    sessionid = request.path_params['sessionid']
-    if sessionid not in SESSIONS:
-        return PlainTextResponse('unknown session ID', status_code=404)
-
+    sessionid, _ = get_session(request)
     f = asyncio.get_running_loop().create_future()
     WAIT_RUNNING_FUTURES.setdefault(sessionid, []).append(f)
     # watch_redis() resolves f
@@ -353,16 +348,15 @@ async def websocket_forward(upstream_ws: WebSocket, target_url: str):
 @requires([AuthScope.authenticated])
 async def handle_session_id_bridge(websocket: WebSocket):
     '''reverse-proxy bridge websocket to session pod'''
-
-    sessionid = websocket.path_params['sessionid']
-    if sessionid not in SESSIONS:
-        await websocket.close(reason='unknown session ID', code=404)
+    try:
+        sessionid, session = get_session(websocket)
+    except HTTPException as e:
+        await websocket.close(e.status_code, e.detail)
         return
 
-    if SESSIONS[sessionid]['status'] == 'wait_target':
+    if session['status'] == 'wait_target':
         asyncio.create_task(update_session(sessionid, 'running'))
-    ip = SESSIONS[sessionid]['ip']
-    await websocket_forward(websocket, f'ws://{ip}:8080{websocket.url.path}')
+    await websocket_forward(websocket, f'ws://{session["ip"]}:8080{websocket.url.path}')
     await update_session(sessionid, 'closed')
 
 
@@ -370,13 +364,12 @@ async def handle_session_id_bridge(websocket: WebSocket):
 @requires([AuthScope.authenticated])
 async def handle_session_id_ws(websocket: WebSocket):
     '''reverse-proxy cockpit websocket to session pod'''
-
-    sessionid = websocket.path_params['sessionid']
-    if sessionid not in SESSIONS:
-        await websocket.close(reason='unknown session ID', code=404)
+    try:
+        sessionid, session = get_session(websocket)
+    except HTTPException as e:
+        await websocket.close(e.status_code, e.detail)
         return
-    ip = SESSIONS[sessionid]['ip']
-    await websocket_forward(websocket, f'ws://{ip}:9090{websocket.url.path}')
+    await websocket_forward(websocket, f'ws://{session["ip"]}:9090{websocket.url.path}')
     await update_session(sessionid, 'closed')
 
 
@@ -386,10 +379,7 @@ async def handle_session_id_http(request: Request):
     '''reverse-proxy cockpit HTTP to session pod'''
 
     upstream_req = request
-    sessionid = upstream_req.path_params['sessionid']
-    session = SESSIONS.get(sessionid)
-    if session is None:
-        return PlainTextResponse('unknown session ID', status_code=404)
+    _, session = get_session(upstream_req)
     if session['status'] == 'closed':
         return HTMLResponse(STATIC_HTML['closed-session.html'])
     elif session['status'] != 'running':
@@ -480,6 +470,27 @@ async def update_session(session_id, status):
     dumped_sessions = json.dumps(SESSIONS)
     await REDIS.set('sessions', dumped_sessions)
     await REDIS.publish('sessions', dumped_sessions)
+
+
+def get_session(conn: HTTPConnection) -> Tuple[str, Dict[str, Union[str, int]]]:
+    """Get session from request/websocket
+
+    Raises 404 for unknwon session ids
+    Raises 403 if session belongs to another organization
+
+    Returns sessionid, session dict
+    """
+    global SESSIONS
+    sessionid = conn.path_params['sessionid']
+    try:
+        session = SESSIONS[sessionid]
+    except KeyError:
+        raise HTTPException(404, 'unknown session ID')
+
+    if session['org_id'] != conn.user.org_id:
+        raise HTTPException(403, 'invalid session ID')
+
+    return sessionid, session
 
 
 # Terrifying hack around broken 3scale Connection: header; see https://issues.redhat.com/browse/RHCLOUD-21326
