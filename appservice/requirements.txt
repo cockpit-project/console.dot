@@ -1,6 +1,0 @@
-redis
-starlette
-httpx
-websockets
-uvicorn
-pyyaml
