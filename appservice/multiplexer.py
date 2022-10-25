@@ -486,7 +486,7 @@ async def update_session(session_id, status):
 def get_session(conn: HTTPConnection) -> Tuple[str, Dict[str, Union[str, int]]]:
     """Get session from request/websocket
 
-    Raises 404 for unknwon session ids
+    Raises 404 for unknown session ids
     Raises 403 if session belongs to another organization
 
     Returns sessionid, session dict
