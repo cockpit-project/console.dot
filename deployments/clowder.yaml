@@ -1,0 +1,61 @@
+# https://consoledot.pages.redhat.com/clowder/dev/api_reference.html
+---
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: cockpit-cloud
+objects:
+- apiVersion: cloud.redhat.com/v1alpha1
+  kind: ClowdApp
+  metadata:
+    name: cockpit-service
+  spec:
+    envName: ${ENV_NAME}
+    testing:
+      # TODO Rename to your IQE plugin name
+      iqePlugin: cockpitidm
+
+    deployments:
+    - name: service
+      minReplicas: 1
+      webServices:
+        public:
+          enabled: true
+      podSpec:
+        image: docker.io/curlimages/curl:latest
+        args:
+        - sleep
+        - infinity
+        readinessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 35
+          exec:
+            command:
+            - test
+            - -f
+            - /usr/bin/curl
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 120
+        livenessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /usr/bin/curl
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+          - name: APPLICATION_PLAYBOOK_DISPATCHER_HOST
+            value: ${{APPLICATION_PLAYBOOK_DISPATCHER_HOST}}
+          - name: APPLICATION_PSK_AUTHORIZATION
+            value: ${{APPLICATION_PSK_AUTHORIZATION}}
+
+
+parameters:
+  - name: ENV_NAME
+    required: true
+  - name: IMAGE_TAG
+    required: true
+  - name: IMAGE
+    value: quay.io/quay/busybox

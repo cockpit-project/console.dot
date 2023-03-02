@@ -2,6 +2,8 @@ NETWORK = consoledot
 CONTAINER_NAME = webconsoleapp
 SERVER_CONTAINER_NAME = webconsoleserver
 PORT_3SCALE = 8443
+VENV = .venv
+VENV_ACTIVATE = $(VENV)/bin/activate
 
 build: 3scale/certs/service-chain.pem server/cockpit-bridge-websocket-connector.pyz containers
 
@@ -61,4 +63,21 @@ k8s-deploy: k8s-clean
 	oc start-build build-webconsoleapp --follow
 	oc create -f webconsoleapp-k8s.yaml
 
-.PHONY: containers run clean build k8s-clean k8s-deploy
+ephemeral-token:
+	xdg-open https://oauth-openshift.apps.c-rh-c-eph.8p0c.p1.openshiftapps.com/oauth/token/request
+
+ephemeral-deploy:
+	source $(VENV_ACTIVATE) && bonfire namespace reserve --duration 1h
+	source $(VENV_ACTIVATE) && bonfire deploy cockpit-cloud cloud-connector host-inventory --frontends=true
+	source $(VENV_ACTIVATE) && bonfire name describe
+
+ephemeral-clean:
+	source $(VENV_ACTIVATE) && bonfire
+
+bonfire:
+	mkdir -p $(VENV)
+	python3 -m venv $(VENV)
+	source $(VENV_ACTIVATE) && pip install crc-bonfire
+
+
+.PHONY: containers run clean build k8s-clean k8s-deploy ephemeral-token ephemeral-deploy ephemeral-clean bonfire
