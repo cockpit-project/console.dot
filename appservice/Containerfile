@@ -6,7 +6,7 @@ RUN microdnf install -y python3-pip iputils procps-ng && microdnf clean all
 RUN printf '[c9s]\nname = C9S\nbaseurl = http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os\ngpgcheck = 0\n' > /etc/yum.repos.d/c9s.repo
 RUN microdnf install --enablerepo=c9s --setopt=install_weak_deps=0 -y cockpit-ws cockpit-bridge && microdnf clean all
 
-RUN pip3 install redis starlette httpx websockets uvicorn
+RUN pip3 install redis starlette httpx websockets uvicorn python-multipart
 
 COPY *.py *.html *.css *.yml /usr/local/bin/
 COPY scripts /

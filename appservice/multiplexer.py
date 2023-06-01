@@ -55,6 +55,7 @@ class Backend(enum.Enum):
 #     status: wait_target or running,
 #     ip: session container address,
 #     org_id: numeric org id from x-rh-identity header
+#     inventory_id: uuid
 # }
 SESSIONS: Dict[str, Dict[str, Union[str, int]]] = {}
 WAIT_RUNNING_FUTURES: Dict[str, List[asyncio.Future]] = {}
@@ -245,6 +246,8 @@ spec:
 async def handle_session_new(request: Request):
     global SESSIONS
 
+    form = await request.form()
+
     sessionid = str(uuid.uuid4())
     assert sessionid not in SESSIONS
 
@@ -282,7 +285,7 @@ async def handle_session_new(request: Request):
             addr = info[0][4][0]
 
             logger.debug('session pod %s resolves to %s', session_hostname, addr)
-            SESSIONS[sessionid] = {'ip': addr, 'status': None, 'org_id': request.user.org_id}
+            SESSIONS[sessionid] = {'ip': addr, 'status': None, 'org_id': request.user.org_id, 'inventory_id': form.get('inventory_id', '')}
             await update_session(sessionid, 'wait_target')
             response = JSONResponse({'id': sessionid})
             break
@@ -317,6 +320,18 @@ async def handle_session_playbook(request: Request):
     sessionid, _ = get_session(request)
     return PlainTextResponse(PLAYBOOK.replace('@@SESSION_ID@@', sessionid))
 
+
+# HACK: temporary for demo
+@app.route(f'{config.ROUTE_API}/sessions/inventory/{{inventoryid}}')
+@requires([AuthScope.authenticated])
+async def handle_session_inventoryid(request: Request):
+    global SESSIONS
+    inventoryid = request.path_params['inventoryid']
+    for sessionid, value in SESSIONS.items():
+        if value.get('inventory_id', '') == inventoryid and value.get('status', '') == 'wait_target':
+            return PlainTextResponse(sessionid)
+
+    raise HTTPException(404, 'unknown inventory ID')
 
 async def ws_up2down(recv_ws: WebSocket, send_ws: websockets.WebSocketClientProtocol):
     while True:
