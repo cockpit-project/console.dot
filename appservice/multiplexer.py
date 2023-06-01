@@ -60,19 +60,23 @@ SESSIONS: Dict[str, Dict[str, Union[str, int]]] = {}
 WAIT_RUNNING_FUTURES: Dict[str, List[asyncio.Future]] = {}
 # file name → content
 STATIC_HTML: Dict[str, str] = {}
+PLAYBOOK = ""
 BACKEND = None
 logger = logging.getLogger('multiplexer')
 app = Starlette()
 
 
 def init():
-    global REDIS, STATIC_HTML, BACKEND
+    global REDIS, STATIC_HTML, BACKEND, PLAYBOOK
 
     REDIS = redis.asyncio.Redis(host=os.environ['REDIS_SERVICE_HOST'],
                                 port=int(os.environ.get('REDIS_SERVICE_PORT', '6379')))
     for html_name in ('wait-session.html', 'closed-session.html', 'unknown-session.html'):
         with open(os.path.join(MY_DIR, html_name)) as f:
             STATIC_HTML[html_name] = f.read()
+
+    with open(os.path.join(MY_DIR, 'playbook.yml')) as f:
+            PLAYBOOK = f.read()
 
     if os.path.exists(K8S_SERVICE_ACCOUNT):
         BACKEND = Backend.K8S
@@ -305,6 +309,13 @@ async def handle_session_wait_running(request: Request):
     WAIT_RUNNING_FUTURES.setdefault(sessionid, []).append(f)
     # watch_redis() resolves f
     return PlainTextResponse(await f)
+
+
+@app.route(f'{config.ROUTE_API}/sessions/{{sessionid}}/playbook')
+@requires([AuthScope.authenticated])
+async def handle_session_playbook(request: Request):
+    sessionid, _ = get_session(request)
+    return PlainTextResponse(PLAYBOOK.replace('@@SESSION_ID@@', sessionid))
 
 
 async def ws_up2down(recv_ws: WebSocket, send_ws: websockets.WebSocketClientProtocol):

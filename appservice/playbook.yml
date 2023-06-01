@@ -1,0 +1,9 @@
+- name: setup connection to console.dot env
+  hosts: localhost
+  vars:
+    session_id: "@@SESSION_ID@@"
+    bridge_connector: "/tmp/cockpit-bridge-websocket-connector.pyz"
+  tasks:
+    # https://ansibledaily.com/execute-detached-process-with-ansible/
+    - name: 
+      shell: "nohup {{ bridge_connector }} --tls-cert /tmp/client.crt --tls-key /tmp/client.key -k wss://_gateway:8443/wss/webconsole/v1/sessions/{{ session_id }}/ws </dev/null >/dev/null 2>&1 &"

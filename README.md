@@ -128,6 +128,11 @@ Both get deployed with
 
    You should now also get a Cockpit UI for the user you started the bridge as. If you check the session status again, it should be "running".
 
+7. Alternatively use the playbook endpoint:
+
+       curl -u user:password https://test.cloud.redhat.com/api/webconsole/v1/sessions/SESSIONID/playbook > playbook.yml
+       ansible-playbook playbook.yml
+
 You can run
 
     make k8s-clean

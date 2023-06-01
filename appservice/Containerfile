@@ -8,7 +8,7 @@ RUN microdnf install --enablerepo=c9s --setopt=install_weak_deps=0 -y cockpit-ws
 
 RUN pip3 install redis starlette httpx websockets uvicorn
 
-COPY *.py *.html *.css /usr/local/bin/
+COPY *.py *.html *.css *.yml /usr/local/bin/
 COPY scripts /
 
 CMD ["python3", "/usr/local/bin/multiplexer.py"]
