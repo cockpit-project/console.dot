@@ -138,3 +138,37 @@ You can run
     make k8s-clean
 
 to remove all resources from Kubernetes again.
+
+
+## Running with insights-inventory-frontend
+
+To demonstrate how Cockpit integration in console.redhat.com might look like,
+there is a modified version of the frontend, to set it up:
+
+    git clone https://github.com/jelly/insights-advisor-frontend/tree/cockpit
+    npm install
+    LOCAL_API=cockpit:8443~https npm run start:proxy:beta
+
+Add the following line to `/etc/hosts`
+
+    127.0.0.1        stage.foo.redhat.com
+
+Enable your RH VPN and make sure your browser is configured to use the work
+proxy this is required to fetch the staging inventory data as this is not mocked.
+
+Open https://stage.foo.redhat.com:1337/preview/insights/inventory
+
+In your cockpit bots repo
+
+    ./vm-run rhel-9-2
+
+Register the machine against the staging environment and make sure `ansible-core` is installed.
+
+    dnf install -y ansible-core
+
+Copy the required programs
+
+    scp server/cockpit-bridge-websocket-connector.pyz 3scale/certs/client.* scripts/rhcd.py c:/tmp/
+
+Start `rhcd.py` which polls an appservice endpoint with it's hardcoded
+inventory id and checks if there is a corresponding session id.
